@@ -47,29 +47,6 @@ class FFmpegEditor:
 
         raise RuntimeError("FFmpeg executable not found. Please install imageio-ffmpeg or add ffmpeg to PATH.")
 
-    def get_media_dimensions(self, media_path: Path) -> Tuple[int, int]:
-        """Extracts resolution width and height from an image or video file."""
-        video_extensions = {".webm", ".mp4", ".mov", ".mkv", ".ogv", ".avi"}
-        if media_path.suffix.lower() not in video_extensions:
-            try:
-                from PIL import Image
-                with Image.open(media_path) as im:
-                    return im.size[0], im.size[1]
-            except Exception:
-                return 1080, 1920
-
-        # Video resolution via ffmpeg probe
-        try:
-            ffmpeg = self.get_ffmpeg_binary()
-            cmd = [ffmpeg, "-i", str(media_path)]
-            res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, errors="ignore")
-            match = re.search(r"Video:.*?\b(\d{3,5})x(\d{3,5})\b", res.stderr)
-            if match:
-                return int(match.group(1)), int(match.group(2))
-        except Exception:
-            pass
-        return 1080, 1920
-
     def format_ass_timestamp(self, seconds: float) -> str:
         """Converts float seconds to ASS format: H:MM:SS.cs"""
         hours = int(seconds // 3600)
@@ -233,31 +210,14 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
             f"dur={duration:.1f}s, motion={motion_effect}, sfx={'yes' if has_sfx else 'none'})"
         )
 
-        media_w, media_h = self.get_media_dimensions(image_path)
-        media_ar = media_w / media_h if media_h > 0 else 0.5625
-        is_landscape_or_square = media_ar > 0.65
-
         if is_video:
-            if is_landscape_or_square:
-                # Horizontal / 16:9 / square video:
-                # Use broadcast-grade ambient blurred wings backdrop to preserve 100% of video content!
-                v_filter = (
-                    f"[0:v]split=2[bg][fg];"
-                    f"[bg]scale={width}:{height}:force_original_aspect_ratio=increase,crop={width}:{height},boxblur=25:5,eq=brightness=-0.12[bg_blur];"
-                    f"[fg]scale={width}:-2:flags=lanczos[fg_scaled];"
-                    f"[bg_blur][fg_scaled]overlay=(W-w)/2:(H-h)/2,"
-                    f"eq=contrast=1.05:saturation=1.10,"
-                    f"format=yuv420p[v]"
-                )
-            else:
-                # Native vertical video (<= 0.65): Full-bleed vertical scale and minimal crop
-                v_filter = (
-                    f"[0:v]scale={width}:{height}:force_original_aspect_ratio=increase:flags=lanczos,"
-                    f"crop={width}:{height},"
-                    f"eq=contrast=1.05:saturation=1.10,"
-                    f"format=yuv420p[v]"
-                )
-
+            # Full-bleed 9:16 vertical crop & scale for all moving video clips
+            v_filter = (
+                f"[0:v]scale={width}:{height}:force_original_aspect_ratio=increase:flags=lanczos,"
+                f"crop={width}:{height},"
+                f"eq=contrast=1.06:saturation=1.12,"
+                f"format=yuv420p[v]"
+            )
             if has_sfx:
                 filter_complex = (
                     f"{v_filter};"
@@ -299,41 +259,27 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
             total_frames = max(30, int(duration * 30))
             p = f"(on/{total_frames})"
 
-            # Subtle, elegant cinematic camera motions (3-4% max drift, eliminating excessive zoom)
             if motion_effect == "zoom_out":
-                zoom_expr = f"z='max(1.04 - {p}*0.03, 1.005)':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)'"
+                zoom_expr = f"z='max(1.22 - {p}*0.20, 1.01)':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)'"
             elif motion_effect == "pan_left":
-                zoom_expr = f"z='1.03':x='(1.0 - {p})*(iw-iw/zoom)':y='ih/2-(ih/zoom/2)'"
+                zoom_expr = f"z='1.18':x='(1.0 - {p})*(iw-iw/zoom)':y='ih/2-(ih/zoom/2)'"
             elif motion_effect == "pan_right":
-                zoom_expr = f"z='1.03':x='({p})*(iw-iw/zoom)':y='ih/2-(ih/zoom/2)'"
+                zoom_expr = f"z='1.18':x='({p})*(iw-iw/zoom)':y='ih/2-(ih/zoom/2)'"
             elif motion_effect in ["drift", "ken_burns"]:
-                zoom_expr = f"z='1.01 + {p}*0.025':x='({p})*(iw-iw/zoom)':y='(1.0 - {p})*(ih-ih/zoom)'"
+                zoom_expr = f"z='1.05 + {p}*0.14':x='({p})*(iw-iw/zoom)':y='(1.0 - {p})*(ih-ih/zoom)'"
             elif motion_effect == "shake":
-                zoom_expr = f"z='1.02':x='iw/2-(iw/zoom/2)+sin(on*0.2)*3':y='ih/2-(ih/zoom/2)+cos(on*0.15)*3'"
+                zoom_expr = f"z='1.12':x='iw/2-(iw/zoom/2)+sin(on*0.25)*10':y='ih/2-(ih/zoom/2)+cos(on*0.2)*10'"
             else:  # zoom_in (default)
-                zoom_expr = f"z='min(1.0 + {p}*0.035, 1.04)':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)'"
+                zoom_expr = f"z='min(1.0 + {p}*0.20, 1.26)':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)'"
 
-            if is_landscape_or_square:
-                # Landscape/square image: ambient blurred backdrop + centered sharp image
-                v_filter = (
-                    f"[0:v]split=2[bg][fg];"
-                    f"[bg]scale={width}:{height}:force_original_aspect_ratio=increase,crop={width}:{height},boxblur=25:5,eq=brightness=-0.12[bg_blur];"
-                    f"[fg]scale={width}:-2:flags=lanczos[fg_scaled];"
-                    f"[bg_blur][fg_scaled]overlay=(W-w)/2:(H-h)/2,"
-                    f"zoompan={zoom_expr}:d={total_frames}:s={width}x{height}:fps=30,"
-                    f"eq=contrast=1.05:saturation=1.10,"
-                    f"format=yuv420p[v]"
-                )
-            else:
-                # Vertical 9:16 frame: scale and minimal gentle zoompan
-                v_filter = (
-                    f"[0:v]scale={width}:{height}:force_original_aspect_ratio=increase:flags=lanczos,"
-                    f"crop={width}:{height},"
-                    f"zoompan={zoom_expr}:d={total_frames}:s={width}x{height}:fps=30,"
-                    f"eq=contrast=1.05:saturation=1.10,"
-                    f"format=yuv420p[v]"
-                )
-
+            # Scale to 1440x2560 canvas to ensure razor sharp 1080x1920 Ken Burns output without blurry bars
+            v_filter = (
+                f"[0:v]scale=1440:2560:force_original_aspect_ratio=increase:flags=lanczos,"
+                f"crop=1440:2560,"
+                f"zoompan={zoom_expr}:d={total_frames}:s={width}x{height}:fps=30,"
+                f"eq=contrast=1.06:saturation=1.12,"
+                f"format=yuv420p[v]"
+            )
             if has_sfx:
                 filter_complex = (
                     f"{v_filter};"
@@ -592,7 +538,6 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 
         report = {
             "passed": passed,
-            "integrity_passed": is_integrity_passed,
             "file_name": video_path.name,
             "file_size_mb": file_size_mb,
             "resolution": resolution,

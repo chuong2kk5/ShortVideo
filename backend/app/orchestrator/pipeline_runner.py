@@ -372,25 +372,14 @@ class PipelineRunner:
                         dur = round(raw_audio_dur + extra_pad, 2)
                         scene_durations.append(dur)
 
-                        # Sound effect assignment: Boom for Intro (Scene 0), Whoosh for Outro (Scene N-1)
-                        sfx_candidate = None
-                        cue = (sc.sound_effect_cue or "").lower()
-                        if idx == 0 or "boom" in cue or "hit" in cue:
-                            p_sfx = BASE_DIR.parent / "assets" / "sfx_library" / "dramatic_boom.wav"
-                            if p_sfx.exists():
-                                sfx_candidate = p_sfx
-                        elif idx == len(scenes) - 1 or "whoosh" in cue:
-                            p_sfx = BASE_DIR.parent / "assets" / "sfx_library" / "whoosh.wav"
-                            if p_sfx.exists():
-                                sfx_candidate = p_sfx
-
+                        # Transition SFX completely disabled per user request: "tắt nó đi tôi không cần"
                         await ffmpeg_editor.render_scene_video(
                             image_path=Path(sc.image_path),
                             audio_path=Path(sc.audio_path),
                             output_video_path=sc_vid_path,
                             duration=dur,
                             motion_effect=sc.motion_effect or "zoom_in",
-                            sfx_path=sfx_candidate,
+                            sfx_path=None,
                         )
                         scene_video_paths.append(sc_vid_path)
 
@@ -458,7 +447,7 @@ class PipelineRunner:
                     output_mp4_path=final_mp4_path,
                     ass_subtitle_path=ass_sub_path,
                     bgm_path=bgm_to_use,
-                    bgm_volume=0.14,
+                    bgm_volume=0.35,
                 )
 
                 # Update project final video path
