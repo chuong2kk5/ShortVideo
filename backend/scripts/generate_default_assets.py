@@ -118,6 +118,95 @@ def generate_dramatic_boom_sfx(output_path: Path, sample_rate: int = 44100):
     print(f"Generated Dramatic Boom SFX: {output_path}")
 
 
+def generate_energetic_beat_music(
+    output_path: Path, duration_sec: int = 90, sample_rate: int = 44100
+):
+    """
+    Generates a punchy modern energetic beat BGM (BPM = 120):
+    - Rhythmic kick drum on quarter notes (every 0.5s).
+    - Crisp hi-hat sizzle on offbeats.
+    - Driving synth bassline in A minor (A2, C3, D3, E3).
+    - Modern TikTok energy for tech, sports, motivation, luxury cars.
+    """
+    total_samples = int(sample_rate * duration_sec)
+    t = np.linspace(0, duration_sec, total_samples, endpoint=False)
+    mix = np.zeros(total_samples)
+
+    # 1. Kick drum (every 0.5s = 120 BPM)
+    beat_step = 0.5
+    for b in np.arange(0, duration_sec - 0.2, beat_step):
+        idx = int(b * sample_rate)
+        k_len = int(0.12 * sample_rate)
+        if idx + k_len < total_samples:
+            tk = np.linspace(0, 0.12, k_len)
+            kick = np.sin(2 * np.pi * 70.0 * np.exp(-18.0 * tk) * tk) * np.exp(-14.0 * tk)
+            mix[idx : idx + k_len] += kick * 0.55
+
+    # 2. Crisp Hi-hats on 8th notes
+    for h in np.arange(0.25, duration_sec - 0.1, beat_step):
+        idx = int(h * sample_rate)
+        h_len = int(0.04 * sample_rate)
+        if idx + h_len < total_samples:
+            noise = np.random.uniform(-1.0, 1.0, h_len)
+            th = np.linspace(0, 0.04, h_len)
+            env = np.exp(-60.0 * th)
+            mix[idx : idx + h_len] += noise * env * 0.18
+
+    # 3. Driving Bassline Synth (A minor: 110Hz, 130.8Hz, 146.8Hz, 164.8Hz)
+    freqs = [110.0, 130.81, 146.83, 164.81]
+    bass = np.zeros(total_samples)
+    for i, b in enumerate(np.arange(0, duration_sec - 0.5, beat_step)):
+        idx = int(b * sample_rate)
+        n_len = int(0.38 * sample_rate)
+        if idx + n_len < total_samples:
+            f = freqs[(i // 2) % len(freqs)]
+            tn = np.linspace(0, 0.38, n_len)
+            saw = (2 * (tn * f - np.floor(tn * f + 0.5))) * np.exp(-4.0 * tn)
+            bass[idx : idx + n_len] += saw * 0.22
+
+    mix += bass
+    # Normalize
+    peak = np.max(np.abs(mix))
+    if peak > 0:
+        mix = mix / peak * 0.85
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    sf.write(str(output_path), mix.astype(np.float32), sample_rate)
+    print(f"Generated Energetic Beat BGM: {output_path}")
+
+
+def generate_calm_ambient_music(
+    output_path: Path, duration_sec: int = 90, sample_rate: int = 44100
+):
+    """
+    Generates a lush, soothing nature & lifestyle ambient BGM:
+    - Gentle warm acoustic pads in D major / G major (D3, F#3, A3, B3).
+    - Slow atmospheric frequency breathing.
+    - Ideal for nature, wild animals, relaxing stories, travel scenery.
+    """
+    total_samples = int(sample_rate * duration_sec)
+    t = np.linspace(0, duration_sec, total_samples, endpoint=False)
+
+    # Chords: D major (146.8Hz, 185.0Hz, 220.0Hz), G major (196.0Hz, 246.9Hz, 293.7Hz)
+    lfo1 = 0.5 + 0.5 * np.sin(2 * np.pi * 0.08 * t)
+    lfo2 = 0.5 + 0.5 * np.cos(2 * np.pi * 0.05 * t)
+
+    pad_d = (np.sin(2 * np.pi * 146.83 * t) + 0.6 * np.sin(2 * np.pi * 220.0 * t)) * lfo1
+    pad_g = (np.sin(2 * np.pi * 196.00 * t) + 0.5 * np.sin(2 * np.pi * 293.66 * t)) * lfo2
+
+    # Gentle high shimmer harmonic
+    shimmer = 0.15 * np.sin(2 * np.pi * 587.33 * t) * (0.6 + 0.4 * np.sin(2 * np.pi * 0.15 * t))
+
+    mix = (pad_d * 0.35 + pad_g * 0.35 + shimmer * 0.15)
+    peak = np.max(np.abs(mix))
+    if peak > 0:
+        mix = mix / peak * 0.82
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    sf.write(str(output_path), mix.astype(np.float32), sample_rate)
+    print(f"Generated Calm Ambient BGM: {output_path}")
+
+
 def main():
     MUSIC_DIR.mkdir(parents=True, exist_ok=True)
     SFX_DIR.mkdir(parents=True, exist_ok=True)
@@ -126,6 +215,12 @@ def main():
 
     bgm_path = MUSIC_DIR / "cinematic_suspense.wav"
     generate_dramatic_cinematic_music(bgm_path, duration_sec=90)
+
+    energetic_path = MUSIC_DIR / "energetic_beat.wav"
+    generate_energetic_beat_music(energetic_path, duration_sec=90)
+
+    calm_path = MUSIC_DIR / "calm_ambient.wav"
+    generate_calm_ambient_music(calm_path, duration_sec=90)
 
     whoosh_path = SFX_DIR / "whoosh.wav"
     generate_whoosh_sfx(whoosh_path)

@@ -70,6 +70,37 @@ class PipelineRunner:
             data=log_entry,
         )
 
+    def _resolve_bgm_for_topic(self, topic: str, title: Optional[str] = None) -> tuple[Optional[Path], str]:
+        """Dynamically picks the ideal BGM mood track based on video topic keywords."""
+        combined = f"{topic or ''} {title or ''}".lower()
+        music_dir = BASE_DIR.parent / "assets" / "music_library"
+
+        # 1. Energetic / Modern / Upbeat
+        if any(w in combined for w in [
+            "xe", "car", "siêu xe", "supercar", "công nghệ", "tech", "tiền", "money",
+            "giàu", "thành công", "động lực", "thể thao", "sport", "gym", "tỷ phú",
+            "robot", "tương lai", "chiến", "kinh doanh", "startup"
+        ]):
+            p = music_dir / "energetic_beat.wav"
+            if p.exists():
+                return p, "Modern Energetic Beat"
+
+        # 2. Calm / Nature / Ambient / Wildlife
+        if any(w in combined for w in [
+            "thiên nhiên", "nature", "rừng", "hoa", "cây", "động vật", "animal",
+            "thú cưng", "pet", "mèo", "chó", "du lịch", "travel", "chữa lành",
+            "bình yên", "cuộc sống", "núi", "biển xanh", "relax"
+        ]):
+            p = music_dir / "calm_ambient.wav"
+            if p.exists():
+                return p, "Lush Calm Ambient"
+
+        # 3. Default: Cinematic Suspense / Mystery
+        p = music_dir / "cinematic_suspense.wav"
+        if p.exists():
+            return p, "Cinematic Suspense"
+        return None, "Default Audio"
+
     async def run_pipeline_task(self, job_id: str, job_type: str = "full_pipeline"):
         """Background worker that sequentially executes stages under Resource Guard."""
         logger.info(f"Starting execution of PipelineJob [{job_id}] type={job_type}...")
@@ -196,7 +227,7 @@ class PipelineRunner:
                         await session.commit()
 
                         is_vid = asset_path.suffix.lower() in [".webm", ".mp4", ".ogv"]
-                        asset_type = "video chuyển động" if is_vid else "hình ảnh thực tế"
+                        asset_type = "video chuyển động 4K" if is_vid else "ảnh AI Flux.1 Siêu Thực 8K"
                         rel_media_url = f"/static/outputs/{project_id}/scenes/{asset_path.name}"
                         pct = 30.0 + (idx + 1) / len(scenes) * 20.0
 
@@ -396,21 +427,21 @@ class PipelineRunner:
                     total_duration=current_time_offset,
                 )
 
-                # Locate BGM
-                bgm_file = BASE_DIR.parent / "assets" / "music_library" / "cinematic_suspense.wav"
-                bgm_to_use = bgm_file if bgm_file.exists() else None
+                # Dynamically match BGM based on topic/title sentiment
+                bgm_file, bgm_name = self._resolve_bgm_for_topic(proj.topic, proj.title)
+                bgm_to_use = bgm_file if (bgm_file and bgm_file.exists()) else None
 
                 # Assemble Final MP4
                 final_mp4_path = project_dir / "final_shorts.mp4"
                 await self.log_job_event(
                     job_id=job_id,
                     stage="video_rendering",
-                    message="Đang xuất bản file MP4 Full HD hoàn chỉnh, hòa âm BGM ducking và burn phụ đề Karaoke...",
+                    message=f"Đang xuất bản file MP4 Full HD hoàn chỉnh, hòa âm BGM '{bgm_name}' (ducking -18dB) và burn phụ đề Karaoke...",
                     progress=90.0,
                     extra_data={
                         "action": "assembling_final_video",
                         "subtitle_style": "Karaoke Dynamic Yellow",
-                        "bgm": "Cinematic Suspense",
+                        "bgm": bgm_name,
                     },
                 )
 

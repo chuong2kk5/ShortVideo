@@ -215,10 +215,11 @@ class ComfyUIProvider:
 
                         ext = Path(vurl.split("?")[0]).suffix.lower()
                         if ext in [".webm", ".mp4", ".ogv"] or vmime.startswith("video/"):
-                            # Check portrait orientation and HD resolution
                             is_portrait = 1 if (vheight > vwidth) else 0
                             is_hd = 1 if (vwidth >= 1280 or vheight >= 720 or (vwidth >= 720 and vheight >= 1280)) else 0
-                            if 300_000 <= vsize <= 50_000_000:
+                            # STRICT QUALITY FILTER: Only accept genuine HD vertical/portrait videos
+                            # If only horizontal or low-res archive clips exist, reject them and use Flux.1 AI 9:16 instead
+                            if is_portrait and is_hd and 500_000 <= vsize <= 50_000_000:
                                 candidates.append((vurl, ext or ".webm", vsize, is_portrait, is_hd, vwidth, vheight))
 
                     # Prioritize native vertical first, then HD quality, then largest file size
@@ -243,6 +244,45 @@ class ComfyUIProvider:
 
         return None
 
+    async def _generate_flux_pollinations(
+        self,
+        prompt: str,
+        output_path: Path,
+        target_w: int = 1080,
+        target_h: int = 1920,
+    ) -> Optional[Path]:
+        """
+        Generates hyper-realistic, photorealistic 9:16 vertical artwork using Flux.1 Schnell via Pollinations.ai.
+        100% free, zero API key required, fast (2-4 seconds).
+        """
+        clean_p = re.sub(
+            r"^(Cinematic|Vertical|Horizontal|9:16|Shot of|Photo of|A photo of)\s*",
+            "",
+            prompt,
+            flags=re.IGNORECASE,
+        ).strip()
+        enhanced_prompt = (
+            f"{clean_p}, cinematic dramatic lighting, photorealistic 8k, hyper-detailed masterpiece, "
+            f"award winning national geographic photography, vertical 9:16 composition, unreal engine 5 render"
+        )
+        encoded = urllib.parse.quote(enhanced_prompt)
+        seed = random.randint(1, 10000000)
+        url = f"https://image.pollinations.ai/prompt/{encoded}?width=720&height=1280&model=flux&nologo=true&seed={seed}"
+
+        try:
+            logger.info("Calling Tier 1 [Flux.1 Photorealistic AI] for 9:16 masterpiece artwork...")
+            async with httpx.AsyncClient(timeout=40.0, follow_redirects=True) as client:
+                res = await client.get(url)
+                if res.status_code == 200 and len(res.content) > 15_000:
+                    raw_img = Image.open(io.BytesIO(res.content)).convert("RGB")
+                    processed = self._crop_and_enhance_to_vertical(raw_img, target_w, target_h)
+                    processed.save(output_path, "JPEG", quality=95)
+                    logger.info(f"Tier 1 [Flux.1 Photorealistic AI] generated successfully: {output_path} ({processed.size})")
+                    return output_path
+        except Exception as e:
+            logger.warning(f"Tier 1 [Flux.1 AI] failed ({e}), falling back to web photographic search...")
+        return None
+
     async def generate_image(
         self,
         prompt: str,
@@ -254,19 +294,35 @@ class ComfyUIProvider:
     ) -> Path:
         """
         Executes tiered visual generation:
-        1. Web Photographic Engine (Google / Bing global web index for authentic photos matching topic)
-        2. Semantic Photographic Matcher (Wikimedia Commons 100M+ high-res photos)
-        3. Google Imagen 3 (Gemini API Key)
-        4. Local ComfyUI (if active)
-        5. Atmospheric Procedural Canvas (final offline fallback)
+        1. Flux.1 Photorealistic AI (Pollinations.ai - 100% Free, Zero Key, 9:16 Masterpiece)
+        2. Web Photographic Engine (Google / Bing global web index for authentic photos matching topic)
+        3. Semantic Photographic Matcher (Wikimedia Commons 100M+ high-res photos)
+        4. Google Imagen 3 (Gemini API Key)
+        5. Local ComfyUI (if active)
+        6. Atmospheric Procedural Canvas (final offline fallback)
         """
         output_path.parent.mkdir(parents=True, exist_ok=True)
 
         # ------------------------------------------------------------------
-        # TIER 1: Web Photographic Engine (Google / Bing Global Web Index)
+        # TIER 1: Flux.1 Photorealistic AI (Pollinations.ai - 100% Free, Zero Key)
         # ------------------------------------------------------------------
         try:
-            logger.info("Calling Tier 1 [Web Photographic Engine] for authentic internet imagery...")
+            flux_img = await self._generate_flux_pollinations(
+                prompt=prompt,
+                output_path=output_path,
+                target_w=width,
+                target_h=height,
+            )
+            if flux_img and flux_img.exists() and flux_img.stat().st_size > 10000:
+                return flux_img
+        except Exception as e:
+            logger.warning(f"Tier 1 [Flux.1 Photorealistic AI] failed: {e}")
+
+        # ------------------------------------------------------------------
+        # TIER 2: Web Photographic Engine (Google / Bing Global Web Index)
+        # ------------------------------------------------------------------
+        try:
+            logger.info("Calling Tier 2 [Web Photographic Engine] for authentic internet imagery...")
             web_photo = await self._search_web_photographic_match(
                 prompt=prompt,
                 keywords=keywords,
@@ -276,16 +332,16 @@ class ComfyUIProvider:
                 target_h=height,
             )
             if web_photo and web_photo.exists() and web_photo.stat().st_size > 5000:
-                logger.info(f"Tier 1 [Web Photographic Engine] successfully retrieved: {output_path}")
+                logger.info(f"Tier 2 [Web Photographic Engine] successfully retrieved: {output_path}")
                 return web_photo
         except Exception as e:
-            logger.warning(f"Tier 1 [Web Photographic Engine] failed: {e}")
+            logger.warning(f"Tier 2 [Web Photographic Engine] failed: {e}")
 
         # ------------------------------------------------------------------
-        # TIER 2: Semantic Photographic Matcher (Wikimedia Commons 100M+ photos)
+        # TIER 3: Semantic Photographic Matcher (Wikimedia Commons 100M+ photos)
         # ------------------------------------------------------------------
         try:
-            logger.info("Calling Tier 2 [Wikimedia Photographic Matcher] for documentary imagery...")
+            logger.info("Calling Tier 3 [Wikimedia Photographic Matcher] for documentary imagery...")
             photo_path = await self._generate_photographic_match(
                 prompt=prompt,
                 keywords=keywords,
@@ -295,40 +351,40 @@ class ComfyUIProvider:
                 target_h=height,
             )
             if photo_path and photo_path.exists() and photo_path.stat().st_size > 5000:
-                logger.info(f"Tier 2 [Wikimedia Matcher] successfully retrieved: {output_path}")
+                logger.info(f"Tier 3 [Wikimedia Matcher] successfully retrieved: {output_path}")
                 return photo_path
         except Exception as e:
-            logger.warning(f"Tier 2 [Wikimedia Matcher] failed: {e}")
+            logger.warning(f"Tier 3 [Wikimedia Matcher] failed: {e}")
 
         # ------------------------------------------------------------------
-        # TIER 3: Google Imagen 3 (Gemini API Key)
+        # TIER 4: Google Imagen 3 (Gemini API Key)
         # ------------------------------------------------------------------
         try:
             from app.services.gemini_image_provider import gemini_image_provider
             gemini_img = await gemini_image_provider.generate_image(prompt, output_path)
             if gemini_img and gemini_img.exists() and gemini_img.stat().st_size > 5000:
-                logger.info(f"Tier 3 [Google Imagen 3] generated: {output_path}")
+                logger.info(f"Tier 4 [Google Imagen 3] generated: {output_path}")
                 return gemini_img
         except Exception as e:
-            logger.warning(f"Tier 3 [Google Imagen 3] failed: {e}")
+            logger.warning(f"Tier 4 [Google Imagen 3] failed: {e}")
 
         # ------------------------------------------------------------------
-        # TIER 4: Local ComfyUI (if running)
+        # TIER 5: Local ComfyUI (if running)
         # ------------------------------------------------------------------
         if await self.is_available():
             try:
                 logger.info(f"ComfyUI is online at {self.base_url}. Generating via SDXL...")
                 image_path = await self._generate_comfyui(prompt, output_path)
                 if image_path and image_path.exists():
-                    logger.info(f"Tier 4 [ComfyUI] generated: {output_path}")
+                    logger.info(f"Tier 5 [ComfyUI] generated: {output_path}")
                     return image_path
             except Exception as e:
-                logger.warning(f"Tier 4 [ComfyUI] failed ({e})")
+                logger.warning(f"Tier 5 [ComfyUI] failed ({e})")
 
         # ------------------------------------------------------------------
-        # TIER 5: Atmospheric Procedural Canvas
+        # TIER 6: Atmospheric Procedural Canvas
         # ------------------------------------------------------------------
-        logger.info("Using Tier 5 procedural cinematic canvas fallback...")
+        logger.info("Using Tier 6 procedural cinematic canvas fallback...")
         return self._generate_procedural_fallback(prompt, output_path, width, height)
 
     async def _generate_comfyui(self, prompt: str, output_path: Path) -> Path:

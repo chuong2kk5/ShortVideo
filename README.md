@@ -14,15 +14,21 @@ Hệ thống tự động hóa sản xuất video ngắn (**TikTok, YouTube Shor
   - **Kết bài (Outro & CTA - Cảnh N-1)**: Đúc kết giá trị và kêu gọi bình luận/theo dõi kênh, tự động phát âm thanh `whoosh` và hiển thị **Thẻ Kêu Gọi Hành Động (CTA Badge)**.
 - **Cam kết thời lượng chuẩn (Pacing Guarantee)**: Đảm bảo độ dài video chính xác theo các mốc lựa chọn (**15s, 30s, 45s, 60s**), không bao giờ bị hụt thời lượng.
 
-### 2. 🌐 Tìm Kiếm Footage Thực Tế Trên Internet (Google & Web Image Index)
-- Tự động phân tích từ khóa của từng phân cảnh để tìm kiếm ảnh 4K/HD và video chuyển động thực tế từ internet.
+### 2. 🎨 Hệ Thống Visual Đa Tầng Thế Hệ Mới (Pexels 4K & Flux.1 AI Siêu Thực 8K)
+- **Mô hình AI Flux.1 Schnell (Miễn phí 100%, Không Cần Key)**: Tự động vẽ hình ảnh nghệ thuật 9:16 dọc Full HD (`1080x1920`) siêu sắc nét chuẩn Midjourney/National Geographic theo sát từng câu thoại của kịch bản.
+- **Tích hợp Pexels API Video 4K 60fps**: Khi cấu hình `PEXELS_API_KEY`, hệ thống tự động ưu tiên tải các video chuyển động dọc quay flycam/drone người thật chất lượng cao.
+- **Bộ lọc chất lượng thông minh (Quality Gatekeeper)**: Tự động loại bỏ các video tư liệu cũ, mờ, độ phân giải thấp từ internet, ưu tiên tối đa ảnh/video sắc nét 1080x1920.
 - **Công nghệ Nền mờ quang học (Ambient Blurred Wings)**: Khung hình ngang 16:9 được đặt sắc nét ở chính giữa trên nền mờ quang học 9:16 Full HD (`1080x1920`), loại bỏ hoàn toàn tình trạng ảnh bị phóng to quá mức hoặc bị cắt xén chi tiết.
 - **Chuyển động điện ảnh nhẹ nhàng (Subtle Breathing Motion)**: Chuyển động máy quay êm dịu (chỉ 3.5% - 4%) tạo chiều sâu thị giác chuẩn điện ảnh.
 
-### 3. 🎤 Giọng Đọc Studio & Phụ Đề Karaoke Động (CapCut Style)
-- **Microsoft Edge-TTS Studio Voices**: Giọng đọc tự nhiên, truyền cảm (`vi-VN-NamMinhNeural`, `vi-VN-HoaiMyNeural`,...).
-- **Phụ đề Karaoke Highlight từng từ**: Từ ngữ đang đọc được đổi màu **Vàng Neon**, các từ còn lại màu trắng với viền đen dày, font chữ `Impact` nổi bật ở 1/3 dưới khung hình.
-- **Hòa âm tự động (Audio Ducking & SFX)**: Nhạc nền BGM tự động giảm âm lượng khi có giọng nói thuyết minh, tích hợp hiệu ứng âm thanh SFX và kết thúc mờ dần (Fade-to-black & Audio fade-out) êm ái.
+### 3. 🎵 Hòa Âm Đa Sắc Thái (Multi-Mood BGM) & Phụ Đề Karaoke Động
+- **Tự động nhận diện tâm trạng & chủ đề (Mood-Based BGM Resolver)**:
+  - *Chủ đề Thể thao, Siêu xe, Công nghệ, Khởi nghiệp, Tiền bạc*: **Modern Energetic Beat** (120 BPM, Bassline sôi động).
+  - *Chủ đề Thiên nhiên, Động vật, Du lịch, Chữa lành*: **Lush Calm Ambient** (Giai điệu âm thanh êm dịu, acoustic sâu lắng).
+  - *Chủ đề Kỳ bí, Đại dương, Vũ trụ, Giật gân*: **Cinematic Suspense** (Hồi hộp, kịch tính, heartbeat sub-bass).
+- **Microsoft Edge-TTS Studio Voices**: Giọng đọc tự nhiên, truyền cảm (`vi-VN-NamMinhNeural`, `vi-VN-HoaiMyNeural`,...), tăng tốc độ đọc `+18% - +22%` tạo nhịp dồn dập.
+- **Phụ đề Karaoke Highlight từng từ (CapCut Style)**: Từ ngữ đang đọc được đổi màu **Vàng Neon**, các từ còn lại màu trắng với viền đen dày, font chữ `Impact` nổi bật ở 1/3 dưới khung hình.
+- **Hòa âm tự động (Audio Ducking & SFX)**: Nhạc nền BGM tự động giảm âm lượng (-18dB) khi có giọng nói thuyết minh, tích hợp hiệu ứng âm thanh SFX (Boom ở mở bài, Whoosh ở kết bài) và kết thúc mờ dần (Fade-to-black & Audio fade-out) êm ái.
 
 ### 4. 🪟 Cửa Sổ Nhỏ Giám Sát Trực Tiếp (AI Studio Live Process)
 - Bảng tiến trình 5 bước sản xuất trực quan: `Kịch Bản` ➡️ `Tìm Footage Web` ➡️ `Thu Âm TTS` ➡️ `Dựng & Kỹ Xảo` ➡️ `Rà Soát`.
