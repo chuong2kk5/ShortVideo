@@ -29,6 +29,13 @@ class ComfyUIProvider:
     def __init__(self):
         self.base_url = settings.COMFYUI_BASE_URL.rstrip("/")
         self._ua = "AIShortsFactory/1.0 (https://github.com/local-user/shorts-factory; contact@shortsfactory.local)"
+        self._used_asset_signatures: set[str] = set()
+
+    def reset_used_assets(self) -> None:
+        """Resets the set of used asset signatures for a new video generation run."""
+        self._used_asset_signatures.clear()
+        logger.info("Reset used asset signatures cache for fresh video run.")
+
 
     async def is_available(self) -> bool:
         """Checks if local ComfyUI server is online."""
@@ -99,12 +106,14 @@ class ComfyUIProvider:
         keywords: Optional[str] = None,
         narration: Optional[str] = None,
         prefer_video: bool = True,
+        topic: Optional[str] = None,
+        scene_index: int = 0,
     ) -> Path:
         """
         Universal visual asset generator:
-        1. Searches and downloads real moving video footage (.webm, .mp4).
+        1. Searches and downloads real moving video footage (.webm, .mp4) strictly matching the topic.
         2. If video is unavailable, falls back to Google Imagen 3 (Gemini API) / ComfyUI / Wikimedia high-res photos.
-        3. Guarantees a valid file (video or image) is returned.
+        3. Guarantees a valid file (video or image) is returned with no duplicates across scenes.
         """
         output_base_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -115,6 +124,8 @@ class ComfyUIProvider:
                     output_path=output_base_path,
                     keywords=keywords,
                     narration=narration,
+                    topic=topic,
+                    scene_index=scene_index,
                 )
                 if vid_path and vid_path.exists() and vid_path.stat().st_size > 100_000:
                     logger.info(f"Using moving stock video asset: {vid_path}")
@@ -131,6 +142,8 @@ class ComfyUIProvider:
             height=height,
             keywords=keywords,
             narration=narration,
+            topic=topic,
+            scene_index=scene_index,
         )
 
     async def find_stock_video_clip(
@@ -139,13 +152,16 @@ class ComfyUIProvider:
         output_path: Path,
         keywords: Optional[str] = None,
         narration: Optional[str] = None,
+        topic: Optional[str] = None,
+        scene_index: int = 0,
     ) -> Optional[Path]:
         """
         Searches for and downloads authentic moving video footage (.webm, .mp4)
-        matching the scene topic from Pexels (if API key available) and Wikimedia Commons.
+        strictly matching the video topic from Pexels (if API key available) and Wikimedia Commons.
+        Skips previously used clips to prevent repetition across scenes.
         """
         output_path.parent.mkdir(parents=True, exist_ok=True)
-        search_candidates = self._extract_search_queries(keywords, prompt, narration)
+        search_candidates = self._extract_search_queries(keywords, prompt, narration, topic=topic)
         headers = {"User-Agent": self._ua}
 
         # 1. Pexels API (if configured)
@@ -153,7 +169,8 @@ class ComfyUIProvider:
             try:
                 for query in search_candidates[:3]:
                     pexels_url = "https://api.pexels.com/videos/search"
-                    params = {"query": query, "orientation": "portrait", "per_page": 3}
+                    page_num = (scene_index // 3) + 1
+                    params = {"query": query, "orientation": "portrait", "per_page": 10, "page": page_num}
                     async with httpx.AsyncClient(timeout=20.0, follow_redirects=True) as client:
                         res = await client.get(
                             pexels_url,
@@ -163,17 +180,24 @@ class ComfyUIProvider:
                         if res.status_code == 200:
                             videos = res.json().get("videos", [])
                             for v in videos:
+                                vid_id = str(v.get("id", ""))
+                                if vid_id and vid_id in self._used_asset_signatures:
+                                    continue
                                 video_files = v.get("video_files", [])
                                 video_files.sort(key=lambda f: abs(f.get("width", 0) - 1080))
                                 for vf in video_files:
                                     link = vf.get("link")
-                                    if link:
-                                        target_vid = output_path.with_suffix(".mp4")
-                                        dl = await client.get(link)
-                                        if dl.status_code == 200 and len(dl.content) > 100_000:
-                                            target_vid.write_bytes(dl.content)
-                                            logger.info(f"Pexels stock video downloaded: {target_vid}")
-                                            return target_vid
+                                    if not link or link in self._used_asset_signatures:
+                                        continue
+                                    target_vid = output_path.with_suffix(".mp4")
+                                    dl = await client.get(link)
+                                    if dl.status_code == 200 and len(dl.content) > 100_000:
+                                        target_vid.write_bytes(dl.content)
+                                        if vid_id:
+                                            self._used_asset_signatures.add(vid_id)
+                                        self._used_asset_signatures.add(link)
+                                        logger.info(f"Pexels stock video downloaded (id={vid_id}): {target_vid}")
+                                        return target_vid
             except Exception as e:
                 logger.warning(f"Pexels video search error: {e}")
 
@@ -213,12 +237,14 @@ class ComfyUIProvider:
                         vwidth = info.get("width", 0)
                         vheight = info.get("height", 0)
 
+                        if vurl in self._used_asset_signatures:
+                            continue
+
                         ext = Path(vurl.split("?")[0]).suffix.lower()
                         if ext in [".webm", ".mp4", ".ogv"] or vmime.startswith("video/"):
                             is_portrait = 1 if (vheight > vwidth) else 0
                             is_hd = 1 if (vwidth >= 1280 or vheight >= 720 or (vwidth >= 720 and vheight >= 1280)) else 0
                             # STRICT QUALITY FILTER: Only accept genuine HD vertical/portrait videos
-                            # If only horizontal or low-res archive clips exist, reject them and use Flux.1 AI 9:16 instead
                             if is_portrait and is_hd and 500_000 <= vsize <= 50_000_000:
                                 candidates.append((vurl, ext or ".webm", vsize, is_portrait, is_hd, vwidth, vheight))
 
@@ -227,6 +253,8 @@ class ComfyUIProvider:
 
                     # Download candidate video
                     for vurl, ext, vsize, is_port, is_hd, vw, vh in candidates:
+                        if vurl in self._used_asset_signatures:
+                            continue
                         try:
                             target_file = output_path.with_suffix(ext if ext in [".webm", ".mp4", ".ogv"] else ".webm")
                             orient_tag = "Portrait " if is_port else ""
@@ -235,6 +263,7 @@ class ComfyUIProvider:
                             dl_res = await client.get(vurl, headers=headers)
                             if dl_res.status_code == 200 and len(dl_res.content) > 100_000:
                                 target_file.write_bytes(dl_res.content)
+                                self._used_asset_signatures.add(vurl)
                                 logger.info(f"Stock video downloaded successfully: {target_file} ({len(dl_res.content)} bytes)")
                                 return target_file
                         except Exception as dl_err:
@@ -250,10 +279,13 @@ class ComfyUIProvider:
         output_path: Path,
         target_w: int = 1080,
         target_h: int = 1920,
+        topic: Optional[str] = None,
+        scene_index: int = 0,
     ) -> Optional[Path]:
         """
         Generates hyper-realistic, photorealistic 9:16 vertical artwork using Flux.1 Schnell via Pollinations.ai.
         100% free, zero API key required, fast (2-4 seconds).
+        Anchors generation strictly to video topic with unique per-scene seeds to prevent repetition.
         """
         clean_p = re.sub(
             r"^(Cinematic|Vertical|Horizontal|9:16|Shot of|Photo of|A photo of)\s*",
@@ -261,16 +293,17 @@ class ComfyUIProvider:
             prompt,
             flags=re.IGNORECASE,
         ).strip()
+        topic_prefix = f"Topic '{topic.strip()}': " if topic and topic.strip() else ""
         enhanced_prompt = (
-            f"{clean_p}, cinematic dramatic lighting, photorealistic 8k, hyper-detailed masterpiece, "
+            f"{topic_prefix}{clean_p}, cinematic dramatic lighting, photorealistic 8k, hyper-detailed masterpiece, "
             f"award winning national geographic photography, vertical 9:16 composition, unreal engine 5 render"
         )
         encoded = urllib.parse.quote(enhanced_prompt)
-        seed = random.randint(1, 10000000)
+        seed = (random.randint(100000, 9000000) + (scene_index + 1) * 31337 + abs(hash(prompt)) % 10000) % 10000000
         url = f"https://image.pollinations.ai/prompt/{encoded}?width=720&height=1280&model=flux&nologo=true&seed={seed}"
 
         try:
-            logger.info("Calling Tier 1 [Flux.1 Photorealistic AI] for 9:16 masterpiece artwork...")
+            logger.info(f"Calling Tier 1 [Flux.1 Photorealistic AI] for scene {scene_index} 9:16 masterpiece artwork (seed={seed})...")
             async with httpx.AsyncClient(timeout=40.0, follow_redirects=True) as client:
                 res = await client.get(url)
                 if res.status_code == 200 and len(res.content) > 15_000:
@@ -291,39 +324,51 @@ class ComfyUIProvider:
         output_path: Path,
         target_w: int = 1080,
         target_h: int = 1920,
+        topic: Optional[str] = None,
+        scene_index: int = 0,
     ) -> Optional[Path]:
         """
         Queries Pexels Photo API for authentic 4K/FullHD portrait photography
         taken by professional photographers worldwide. Requires PEXELS_API_KEY.
+        Strictly anchors search to video topic and skips previously used photos.
         """
         api_key = getattr(settings, "PEXELS_API_KEY", "").strip()
         if not api_key:
             return None
 
-        search_candidates = self._extract_search_queries(keywords, prompt, narration)
+        search_candidates = self._extract_search_queries(keywords, prompt, narration, topic=topic)
         headers = {"Authorization": api_key}
+        page_num = (scene_index // 3) + 1
 
         async with httpx.AsyncClient(timeout=20.0, follow_redirects=True) as client:
             for query in search_candidates[:3]:
                 try:
-                    logger.info(f"Querying Pexels Photo API for: '{query}'...")
+                    logger.info(f"Querying Pexels Photo API for: '{query}' (page {page_num})...")
                     res = await client.get(
                         "https://api.pexels.com/v1/search",
-                        params={"query": query, "orientation": "portrait", "per_page": 5, "size": "large"},
+                        params={"query": query, "orientation": "portrait", "per_page": 15, "page": page_num, "size": "large"},
                         headers=headers,
                     )
                     if res.status_code == 200:
                         photos = res.json().get("photos", [])
                         for p in photos:
+                            photo_id = str(p.get("id", ""))
+                            if photo_id and photo_id in self._used_asset_signatures:
+                                continue
                             srcs = p.get("src", {})
                             photo_url = srcs.get("large2x") or srcs.get("original") or srcs.get("large") or srcs.get("portrait")
                             if photo_url:
+                                if photo_url in self._used_asset_signatures:
+                                    continue
                                 dl = await client.get(photo_url)
                                 if dl.status_code == 200 and len(dl.content) > 30_000:
                                     raw_img = Image.open(io.BytesIO(dl.content)).convert("RGB")
                                     processed = self._crop_and_enhance_to_vertical(raw_img, target_w, target_h)
                                     processed.save(output_path, "JPEG", quality=95)
-                                    logger.info(f"Pexels authentic photo downloaded successfully: {output_path}")
+                                    if photo_id:
+                                        self._used_asset_signatures.add(photo_id)
+                                    self._used_asset_signatures.add(photo_url)
+                                    logger.info(f"Pexels authentic photo downloaded successfully (id={photo_id}): {output_path}")
                                     return output_path
                 except Exception as e:
                     logger.warning(f"Pexels photo search failed for '{query}': {e}")
@@ -337,6 +382,8 @@ class ComfyUIProvider:
         height: int = 1920,
         keywords: Optional[str] = None,
         narration: Optional[str] = None,
+        topic: Optional[str] = None,
+        scene_index: int = 0,
     ) -> Path:
         """
         Executes tiered visual generation:
@@ -363,6 +410,8 @@ class ComfyUIProvider:
                     output_path=output_path,
                     target_w=width,
                     target_h=height,
+                    topic=topic,
+                    scene_index=scene_index,
                 )
                 if pexels_img and pexels_img.exists() and pexels_img.stat().st_size > 10000:
                     logger.info(f"Tier 0 [Pexels Photo API] successfully retrieved: {output_path}")
@@ -379,6 +428,8 @@ class ComfyUIProvider:
                 output_path=output_path,
                 target_w=width,
                 target_h=height,
+                topic=topic,
+                scene_index=scene_index,
             )
             if flux_img and flux_img.exists() and flux_img.stat().st_size > 10000:
                 return flux_img
@@ -397,6 +448,8 @@ class ComfyUIProvider:
                 output_path=output_path,
                 target_w=width,
                 target_h=height,
+                topic=topic,
+                scene_index=scene_index,
             )
             if web_photo and web_photo.exists() and web_photo.stat().st_size > 5000:
                 logger.info(f"Tier 2 [Web Photographic Engine] successfully retrieved: {output_path}")
@@ -416,6 +469,8 @@ class ComfyUIProvider:
                 output_path=output_path,
                 target_w=width,
                 target_h=height,
+                topic=topic,
+                scene_index=scene_index,
             )
             if photo_path and photo_path.exists() and photo_path.stat().st_size > 5000:
                 logger.info(f"Tier 3 [Wikimedia Matcher] successfully retrieved: {output_path}")
@@ -494,49 +549,102 @@ class ComfyUIProvider:
         keywords: Optional[str],
         prompt: str,
         narration: Optional[str] = None,
+        topic: Optional[str] = None,
     ) -> List[str]:
-        """Generates a prioritized list of search keyword strings for video & photographic matching."""
+        """
+        Generates a strictly topic-anchored, prioritized list of search keyword strings
+        for video & photographic matching.
+        Ensures NO off-topic images by anchoring all queries with the main video topic.
+        """
         queries: List[str] = []
 
-        # 1. Primary Keywords (most concrete subject)
-        if keywords and keywords.strip():
-            clean_kw = re.sub(r'["\',;.]', ' ', keywords).strip()
-            queries.append(clean_kw)
-            words = [w for w in clean_kw.split() if len(w) > 2]
-            if len(words) > 2:
-                queries.append(" ".join(words[:2]))
-            # Also append the primary anchor noun (first or last word)
-            if words:
-                queries.append(words[0])
-                if len(words) > 1 and words[-1] != words[0]:
-                    queries.append(words[-1])
+        # 1. Clean the main topic anchor
+        clean_topic = ""
+        if topic and topic.strip():
+            clean_topic = re.sub(r'["\',;.#?!]', ' ', topic).strip()
+            clean_topic = re.sub(
+                r'^(chủ đề|video về|tìm hiểu về|khám phá|bí mật về|sự thật về|câu chuyện về|top|hướng dẫn)\s+',
+                '',
+                clean_topic,
+                flags=re.IGNORECASE,
+            ).strip()
 
-        # 2. Clean prompt to extract actual physical subject
+        # 2. Extract concrete physical subject from prompt
         p = re.sub(
-            r"^(Cinematic|Vertical|Horizontal|Dramatic|Epic|Wide|Close-up|Macro|Aerial|Drone|High-definition|Ultra-detailed|Photorealistic|Panoramic shot|A photo of|Shot of)\s*(vertical)?\s*(9:16)?\s*(shot|angle|view|framing|photo|image|scene)?\s*(of|representing)?\s*",
+            r"^(Cinematic|Vertical|Horizontal|Dramatic|Epic|Wide|Close-up|Macro|Aerial|Drone|High-definition|Ultra-detailed|Photorealistic|Panoramic shot|A photo of|Shot of|Photo of|Scene representing)\s*(vertical)?\s*(9:16)?\s*(shot|angle|view|framing|photo|image|scene)?\s*(of|representing)?\s*",
             "",
             prompt,
             flags=re.IGNORECASE,
         ).strip()
         p = re.sub(
-            r"(8k resolution|volumetric lighting|hyper-detailed|cinematic lighting|4k|photorealistic|9:16 vertical|unreal engine|scene \d+).*",
+            r"(8k resolution|volumetric lighting|hyper-detailed|cinematic lighting|4k|photorealistic|9:16 vertical|unreal engine.*|scene \d+).*",
             "",
             p,
             flags=re.IGNORECASE,
         ).strip()
 
         clauses = [c.strip() for c in re.split(r"[,;.]", p) if len(c.strip()) > 3]
-        for c in clauses[:2]:
-            clean_c = " ".join([w for w in c.split() if w.lower() not in {"shot", "scene", "representing", "cinematic", "vertical", "composition"}][:3])
+        clean_prompt_subject = ""
+        if clauses:
+            clean_c = " ".join([w for w in clauses[0].split() if w.lower() not in {"shot", "scene", "representing", "cinematic", "vertical", "composition", "the", "a", "an", "with", "and"}][:4])
             if len(clean_c) > 2:
-                queries.append(clean_c)
+                clean_prompt_subject = clean_c
 
-        # De-duplicate while preserving priority order
+        # 3. Clean keywords
+        clean_kw = ""
+        if keywords and keywords.strip():
+            clean_kw = re.sub(r'["\',;.]', ' ', keywords).strip()
+
+        # 4. Construct topic-anchored queries
+        if clean_topic:
+            # A. Topic + concrete keywords
+            if clean_kw:
+                if clean_topic.lower() in clean_kw.lower():
+                    queries.append(clean_kw)
+                else:
+                    queries.append(f"{clean_topic} {clean_kw}")
+
+                words = [w for w in clean_kw.split() if len(w) > 2]
+                if len(words) >= 2:
+                    short_kw = " ".join(words[:2])
+                    if clean_topic.lower() not in short_kw.lower():
+                        queries.append(f"{clean_topic} {short_kw}")
+                    else:
+                        queries.append(short_kw)
+
+            # B. Topic + prompt subject
+            if clean_prompt_subject:
+                if clean_topic.lower() in clean_prompt_subject.lower():
+                    queries.append(clean_prompt_subject)
+                else:
+                    queries.append(f"{clean_topic} {clean_prompt_subject}")
+
+            # C. Topic alone
+            queries.append(clean_topic)
+
+            # D. Secondary prompt subject (if strong English phrase >= 2 words)
+            if clean_prompt_subject and len(clean_prompt_subject.split()) >= 2:
+                queries.append(clean_prompt_subject)
+
+            # E. Secondary clean keywords (if multi-word phrase)
+            if clean_kw and len(clean_kw.split()) >= 2:
+                queries.append(clean_kw)
+        else:
+            # Fallback when topic is absent
+            if clean_kw:
+                queries.append(clean_kw)
+                words = [w for w in clean_kw.split() if len(w) > 2]
+                if len(words) >= 2:
+                    queries.append(" ".join(words[:2]))
+            if clean_prompt_subject:
+                queries.append(clean_prompt_subject)
+
+        # De-duplicate while preserving priority order & skipping short generic garbage
         seen = set()
         deduped = []
         for q in queries:
             q_clean = q.strip().lower()
-            if q_clean and q_clean not in seen:
+            if q_clean and len(q_clean) >= 3 and q_clean not in seen:
                 seen.add(q_clean)
                 deduped.append(q.strip())
         return deduped
@@ -549,13 +657,16 @@ class ComfyUIProvider:
         output_path: Path,
         target_w: int = 1080,
         target_h: int = 1920,
+        topic: Optional[str] = None,
+        scene_index: int = 0,
     ) -> Optional[Path]:
         """
         Queries global web photographic index (Google / Bing web image search index)
         for real, authentic high-resolution photos matching the scene context.
         Prioritizes tall/portrait 9:16 images, then large 4K/HD images.
+        Deduplicates against previously used visual assets.
         """
-        search_candidates = self._extract_search_queries(keywords, prompt, narration)
+        search_candidates = self._extract_search_queries(keywords, prompt, narration, topic=topic)
         headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
             "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
@@ -586,7 +697,7 @@ class ComfyUIProvider:
                                 clean_u = urllib.parse.unquote(u)
                                 ext = Path(clean_u.split('?')[0]).suffix.lower()
                                 if ext in ['.jpg', '.jpeg', '.png', '.webp'] or not ext:
-                                    if clean_u not in candidate_urls:
+                                    if clean_u not in candidate_urls and clean_u not in self._used_asset_signatures:
                                         candidate_urls.append(clean_u)
                         if len(candidate_urls) >= 12:
                             break
@@ -595,6 +706,8 @@ class ComfyUIProvider:
 
                 # Download best candidate
                 for img_url in candidate_urls[:10]:
+                    if img_url in self._used_asset_signatures:
+                        continue
                     try:
                         dl = await client.get(img_url, timeout=8.0)
                         if dl.status_code == 200 and len(dl.content) > 20_000:
@@ -603,6 +716,7 @@ class ComfyUIProvider:
                             if w >= 450 and h >= 450:
                                 processed = self._crop_and_enhance_to_vertical(raw_img, target_w, target_h)
                                 processed.save(output_path, "JPEG", quality=95)
+                                self._used_asset_signatures.add(img_url)
                                 logger.info(
                                     f"Web photo successfully retrieved and formatted for '{query}': {output_path} (orig: {w}x{h})"
                                 )
@@ -620,12 +734,15 @@ class ComfyUIProvider:
         output_path: Path,
         target_w: int = 1080,
         target_h: int = 1920,
+        topic: Optional[str] = None,
+        scene_index: int = 0,
     ) -> Optional[Path]:
         """
         Queries Wikimedia Commons for real photographic images matching the keywords,
         downloads the highest quality candidate, and crops/scales to vertical 9:16.
+        Deduplicates against previously used visual assets.
         """
-        search_candidates = self._extract_search_queries(keywords, prompt, narration)
+        search_candidates = self._extract_search_queries(keywords, prompt, narration, topic=topic)
         headers = {"User-Agent": self._ua}
 
         async with httpx.AsyncClient(timeout=15.0, follow_redirects=True) as client:
@@ -644,7 +761,7 @@ class ComfyUIProvider:
                             "prop": "imageinfo",
                             "iiprop": "url|mime|size",
                             "format": "json",
-                            "gsrlimit": 5,
+                            "gsrlimit": 8,
                         },
                         headers=headers,
                     )
@@ -661,23 +778,27 @@ class ComfyUIProvider:
                         mime = info.get("mime", "")
                         width = info.get("width", 0)
                         height = info.get("height", 0)
+                        u = info.get("url")
 
                         # We want photographic formats with reasonable size
                         if mime in ["image/jpeg", "image/png", "image/webp"] and width >= 600 and height >= 600:
-                            candidate_urls.append(info.get("url"))
+                            if u and u not in self._used_asset_signatures:
+                                candidate_urls.append(u)
 
                     if not candidate_urls:
-                        # Try without filetype filter
                         continue
 
                     # Download candidate image
                     for img_url in candidate_urls:
+                        if img_url in self._used_asset_signatures:
+                            continue
                         try:
                             dl_res = await client.get(img_url, headers=headers)
                             if dl_res.status_code == 200 and len(dl_res.content) > 10000:
                                 raw_img = Image.open(io.BytesIO(dl_res.content)).convert("RGB")
                                 processed = self._crop_and_enhance_to_vertical(raw_img, target_w, target_h)
                                 processed.save(output_path, "JPEG", quality=95)
+                                self._used_asset_signatures.add(img_url)
                                 logger.info(
                                     f"Successfully retrieved and processed photo for '{query}': {output_path}"
                                 )

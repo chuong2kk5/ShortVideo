@@ -192,6 +192,7 @@ class PipelineRunner:
                     stmt = select(Project).where(Project.id == project_id).options(selectinload(Project.scenes))
                     proj = (await session.execute(stmt)).scalar_one()
                     scenes = proj.scenes
+                    comfyui_provider.reset_used_assets()
 
                     has_pexels = bool(getattr(settings, "PEXELS_API_KEY", "").strip())
                     engine_name = "Pexels 4K Pro Library" if has_pexels else "Flux.1 AI Siêu Thực & Web Index"
@@ -224,6 +225,8 @@ class PipelineRunner:
                             keywords=getattr(sc, "visual_keywords", None),
                             narration=sc.narration_text,
                             prefer_video=True,
+                            topic=proj.topic,
+                            scene_index=idx,
                         )
                         sc.image_path = str(asset_path)
                         sc.status = "image_ready"
