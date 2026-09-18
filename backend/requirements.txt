@@ -1,0 +1,30 @@
+# Core Web & API
+fastapi>=0.115.0
+uvicorn[standard]>=0.30.0
+python-multipart>=0.0.9
+websockets>=12.0
+
+# Data & Models
+pydantic>=2.8.0
+pydantic-settings>=2.4.0
+sqlalchemy>=2.0.30
+aiosqlite>=0.20.0
+
+# Networking & System
+httpx>=0.27.0
+psutil>=6.0.0
+python-dotenv>=1.0.1
+
+# Phase 2: AI Video & Audio Engines
+edge-tts>=6.1.12
+gTTS>=2.5.4
+pyttsx3>=2.99
+imageio-ffmpeg>=0.5.1
+numpy>=1.26.0
+soundfile>=0.12.1
+pillow>=10.4.0
+
+# Phase 3: YouTube Data API & OAuth2
+google-api-python-client>=2.140.0
+google-auth-oauthlib>=1.2.1
+google-auth-httplib2>=0.2.0
