@@ -193,12 +193,15 @@ class PipelineRunner:
                     proj = (await session.execute(stmt)).scalar_one()
                     scenes = proj.scenes
 
+                    has_pexels = bool(getattr(settings, "PEXELS_API_KEY", "").strip())
+                    engine_name = "Pexels 4K Pro Library" if has_pexels else "Flux.1 AI Siêu Thực & Web Index"
+
                     for idx, sc in enumerate(scenes):
                         # Broadcast searching event with prompt & keywords
                         await self.log_job_event(
                             job_id=job_id,
                             stage="image_generation",
-                            message=f"Cảnh {idx+1}/{len(scenes)}: Đang quét Google / Bing tìm kiếm footage '{getattr(sc, 'visual_keywords', '')}'...",
+                            message=f"Cảnh {idx+1}/{len(scenes)}: Đang lấy visual từ {engine_name} cho '{getattr(sc, 'visual_keywords', '')}'...",
                             progress=round(30.0 + idx / len(scenes) * 20.0, 1),
                             extra_data={
                                 "scene_index": idx,
@@ -206,7 +209,7 @@ class PipelineRunner:
                                 "narration": sc.narration_text,
                                 "visual_prompt": sc.visual_prompt,
                                 "visual_keywords": getattr(sc, "visual_keywords", ""),
-                                "search_engine": "Google / Bing Web Index",
+                                "search_engine": engine_name,
                                 "action": "searching_web",
                                 "status": "searching",
                             },
@@ -227,7 +230,12 @@ class PipelineRunner:
                         await session.commit()
 
                         is_vid = asset_path.suffix.lower() in [".webm", ".mp4", ".ogv"]
-                        asset_type = "video chuyển động 4K" if is_vid else "ảnh AI Flux.1 Siêu Thực 8K"
+                        if is_vid:
+                            asset_type = "video chuyển động 4K (Pexels)"
+                        elif has_pexels:
+                            asset_type = "ảnh chụp Pexels 4K"
+                        else:
+                            asset_type = "ảnh AI Flux.1 Siêu Thực 8K"
                         rel_media_url = f"/static/outputs/{project_id}/scenes/{asset_path.name}"
                         pct = 30.0 + (idx + 1) / len(scenes) * 20.0
 

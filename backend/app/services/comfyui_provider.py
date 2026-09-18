@@ -283,6 +283,52 @@ class ComfyUIProvider:
             logger.warning(f"Tier 1 [Flux.1 AI] failed ({e}), falling back to web photographic search...")
         return None
 
+    async def _search_pexels_photo(
+        self,
+        prompt: str,
+        keywords: Optional[str],
+        narration: Optional[str],
+        output_path: Path,
+        target_w: int = 1080,
+        target_h: int = 1920,
+    ) -> Optional[Path]:
+        """
+        Queries Pexels Photo API for authentic 4K/FullHD portrait photography
+        taken by professional photographers worldwide. Requires PEXELS_API_KEY.
+        """
+        api_key = getattr(settings, "PEXELS_API_KEY", "").strip()
+        if not api_key:
+            return None
+
+        search_candidates = self._extract_search_queries(keywords, prompt, narration)
+        headers = {"Authorization": api_key}
+
+        async with httpx.AsyncClient(timeout=20.0, follow_redirects=True) as client:
+            for query in search_candidates[:3]:
+                try:
+                    logger.info(f"Querying Pexels Photo API for: '{query}'...")
+                    res = await client.get(
+                        "https://api.pexels.com/v1/search",
+                        params={"query": query, "orientation": "portrait", "per_page": 5, "size": "large"},
+                        headers=headers,
+                    )
+                    if res.status_code == 200:
+                        photos = res.json().get("photos", [])
+                        for p in photos:
+                            srcs = p.get("src", {})
+                            photo_url = srcs.get("large2x") or srcs.get("original") or srcs.get("large") or srcs.get("portrait")
+                            if photo_url:
+                                dl = await client.get(photo_url)
+                                if dl.status_code == 200 and len(dl.content) > 30_000:
+                                    raw_img = Image.open(io.BytesIO(dl.content)).convert("RGB")
+                                    processed = self._crop_and_enhance_to_vertical(raw_img, target_w, target_h)
+                                    processed.save(output_path, "JPEG", quality=95)
+                                    logger.info(f"Pexels authentic photo downloaded successfully: {output_path}")
+                                    return output_path
+                except Exception as e:
+                    logger.warning(f"Pexels photo search failed for '{query}': {e}")
+        return None
+
     async def generate_image(
         self,
         prompt: str,
@@ -294,6 +340,7 @@ class ComfyUIProvider:
     ) -> Path:
         """
         Executes tiered visual generation:
+        0. Pexels Photo API (When PEXELS_API_KEY is configured in .env)
         1. Flux.1 Photorealistic AI (Pollinations.ai - 100% Free, Zero Key, 9:16 Masterpiece)
         2. Web Photographic Engine (Google / Bing global web index for authentic photos matching topic)
         3. Semantic Photographic Matcher (Wikimedia Commons 100M+ high-res photos)
@@ -302,6 +349,26 @@ class ComfyUIProvider:
         6. Atmospheric Procedural Canvas (final offline fallback)
         """
         output_path.parent.mkdir(parents=True, exist_ok=True)
+
+        # ------------------------------------------------------------------
+        # TIER 0: Pexels Curated 4K Photo API (Active when PEXELS_API_KEY is provided)
+        # ------------------------------------------------------------------
+        if getattr(settings, "PEXELS_API_KEY", "").strip():
+            try:
+                logger.info("Calling Tier 0 [Pexels Photo API] for authentic curated 4K photography...")
+                pexels_img = await self._search_pexels_photo(
+                    prompt=prompt,
+                    keywords=keywords,
+                    narration=narration,
+                    output_path=output_path,
+                    target_w=width,
+                    target_h=height,
+                )
+                if pexels_img and pexels_img.exists() and pexels_img.stat().st_size > 10000:
+                    logger.info(f"Tier 0 [Pexels Photo API] successfully retrieved: {output_path}")
+                    return pexels_img
+            except Exception as e:
+                logger.warning(f"Tier 0 [Pexels Photo API] failed: {e}")
 
         # ------------------------------------------------------------------
         # TIER 1: Flux.1 Photorealistic AI (Pollinations.ai - 100% Free, Zero Key)
