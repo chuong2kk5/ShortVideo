@@ -86,32 +86,32 @@ You produce million-view, high-retention videos that hold viewer attention from 
 
 ### STRICT TOPIC CONSTRAINT:
 The user will provide a specific TOPIC. You MUST write the script 100% EXCLUSIVELY and DIRECTLY about that specific TOPIC.
-NEVER substitute the topic with pyramids, ancient egypt, or any unrelated subject. Every single sentence of narration, hook, and visual prompt MUST be directly related to the user's topic.
+NEVER substitute the topic with pyramids, ancient egypt, or any unrelated subject.
 
-### NATURAL SPOKEN VIETNAMESE & RETENTION ARCHITECTURE:
-1. KHẨU NGỮ TỰ NHIÊN (SPOKEN VIETNAMESE EXCELLENCE):
+### IMMERSIVE STORYTELLING MASTERY (KỂ CHUYỆN NHẬP VAI - TUYỆT ĐỐI KHÔNG TẢ VĂN GIÁO KHOA):
+1. KHÔNG VIẾT KIỂU TẢ VĂN / ĐỊNH NGHĨA KHÔ KHAN:
+   - TUYỆT ĐỐI KHÔNG dùng các câu thuyết minh sáo rỗng, nhận định trừu tượng như: "Khoa học hiện đại vẫn chưa thể giải thích nổi...", "Các chuyên gia đã vô cùng kinh ngạc...", "Nơi đây có khí hậu khắc nghiệt và nhiều điều bí ẩn...".
    - Tuyệt đối TRÁNH các câu văn mẫu sáo rỗng bị lặp đi lặp lại như: "99% mọi người đều hiểu sai về...", "Bí mật đáng sợ nhất mà họ không muốn bạn biết...", "Điều này nghe có vẻ điên rồ...".
-   - Thay vào đó, hãy sáng tạo câu mở đầu (Hook) ĐỘC ĐÁO, THÔNG MINH, gắn liền trực tiếp với bối cảnh cụ thể của chủ đề!
+
+2. KỂ CHUYỆN CÓ CỐT TRUYỆN, NHÂN VẬT & DIỄN BIẾN LE TĂNG (STORY ARC):
+   - Mở màn bằng một biến cố giật gân, nhân vật thực tế, hoặc tình huống đưa người xem trực tiếp vào vai người trải nghiệm.
+   - Từng phân cảnh là một bước phát triển kịch tính tiếp nối của câu chuyện (hành động nhân vật, khám phá nguy hiểm, tiếng động kỳ lạ, bước ngoặt sốc).
+   - Tận dụng tối đa chi tiết giác quan (tiếng la bàn quay cuồng, bóng đen vụt qua cây cổ thụ, tiếng thì thầm trong sương đêm, vết rách trên lều...).
+
+3. CẤM LẶP LẠI NGUYÊN VĂN TÊN CHỦ ĐỀ TRONG LỜI THOẠI (STRICT ANTI-TOPIC-REPETITION):
+   - TUYỆT ĐỐI KHÔNG chèn nguyên văn cụm từ chủ đề vào giữa câu thoại (ví dụ cấm nói: "xảy ra tại những vụ mất tích bí ẩn trong rừng amazon").
+   - Hãy dùng ngôn ngữ tự nhiên: "vùng đất chết này", "chuyến thám hiểm định mệnh", "họ", "đoàn người", "con quái vật", "nơi đây"...
+
+4. KHẨU NGỮ TỰ NHIÊN & ĐIỂM RƠI NHỊP ĐIỆU (SPOKEN VIETNAMESE CADENCE):
    - Sử dụng ngôn từ nói chuyện đời thường, truyền cảm, có hồn, giàu hình ảnh.
    - Ngắt câu nhịp nhàng (5 đến 8 từ một vế câu). Sử dụng dấu phẩy (,), dấu chấm (.), dấu ba chấm (...) khéo léo để giọng đọc AI ngắt nghỉ tự nhiên, có điểm rơi nhịp điệu (cadence).
 
-2. SCENE 0 (MỞ BÀI - INTRO HOOK):
-   - Ngắt nhịp lướt màn hình ngay giây đầu tiên (Pattern Interrupt).
-   - Câu thoại của Cảnh 0 là câu Hook sắc bén, kích thích trí tò mò hoặc đánh thẳng vào cảm xúc người xem.
-   - Gán cue âm thanh: "dramatic_boom".
-
-3. SCENES 1 to N-2 (THÂN BÀI - VALUE & TENSION LOOPS):
-   - Nhịp độ dồn dập, đổi góc nhìn mỗi 2.7 đến 3.2 giây.
-   - Cầu nối lôi cuốn giữa các cảnh: "Thế nhưng...", "Điều kỳ lạ là...", "Và sự thật còn bất ngờ hơn thế...".
-
-4. SCENE N-1 (KẾT BÀI - OUTRO & ENGAGING CTA):
-   - Đúc kết cô đọng giá trị hoặc góc nhìn mới, kèm câu hỏi gợi tranh luận tự nhiên và kêu gọi follow kênh.
-   - Gán cue âm thanh: "whoosh".
-
-### VISUAL PROMPTS & KEYWORDS (CRITICAL FOR PHOTO & VIDEO ENGINES):
-- Visual Prompts (visual_prompt): MUST BE IN ENGLISH, highly descriptive, cinematic lighting, 9:16 vertical composition, 8k resolution, tailored to the requested Art Style.
-- Visual Keywords (visual_keywords): MUST BE 1 TO 3 CONCRETE PHYSICAL NOUNS / ACTIONS IN ENGLISH (e.g. "tiger hunting", "lightning storm", "supercar drift", "deep sea creature", "erupting volcano", "cyberpunk robot").
-  NEVER use abstract words like "mystery", "history", "amazing". Concrete physical subjects allow the AI and stock engines to pull breathtaking footage!
+### VISUAL PROMPTS & KEYWORDS (100% TIED TO STORY ACTION):
+- Visual Prompts (visual_prompt): MUST BE 100% IN ENGLISH, highly descriptive, cinematic lighting, 9:16 vertical composition, 8k resolution, tailored to the requested Art Style.
+  - MUST depict the EXACT PHYSICAL STORY ACTION occurring in THAT scene (e.g. "British explorer in 1920s gear holding lantern trekking through dark foggy rainforest vines", "Close up of torn expedition tent flapping violently in stormy jungle wind").
+  - NEVER use generic abstract props like "magnifying glass on desk", "paper map on table", "scientist office" unless the topic is literally an office desk! Show the actual jungle, space, animals, ocean, or characters!
+- Visual Keywords (visual_keywords): MUST BE 2 TO 4 CONCRETE PHYSICAL ENGLISH NOUNS (e.g. "rainforest explorer lantern", "abandoned campsite rain", "dense jungle mist night", "ancient stone ruins").
+  NEVER use abstract words like "mystery", "history", "amazing". Concrete physical subjects allow the AI engines to render breathtaking footage!
 
 ### OUTPUT FORMAT:
 You MUST respond with a single valid JSON object strictly matching the schema.
@@ -163,19 +163,19 @@ def build_user_prompt(
         m = motions[i % len(motions)]
         if i == 0:
             s = "dramatic_boom"
-            narration_placeholder = f"<MỞ BÀI: Câu Hook mở đầu sắc bén, cuốn hút về {topic} ({words_per_scene})>"
+            narration_placeholder = f"<MỞ BÀI: Câu Hook giật gân, cuốn người xem ngay lập tức vào câu chuyện ({words_per_scene})>"
         elif i == min_scenes - 1:
             s = "whoosh"
             narration_placeholder = f"<KẾT BÀI: Đúc kết bất ngờ và kêu gọi người xem bình luận, follow kênh ngay ({words_per_scene})>"
         else:
             s = sfxs[(i - 1) % len(sfxs)]
-            narration_placeholder = f"<THÂN BÀI: Chi tiết gay cấn/sự thật cảnh {i+1} về {topic} ({words_per_scene})>"
+            narration_placeholder = f"<THÂN BÀI CẢNH {i+1}: Diễn biến kịch tính tiếp theo của câu chuyện, hành động cụ thể ({words_per_scene})>"
 
         scene_templates.append(f"""    {{
       "scene_index": {i},
       "narration": "{narration_placeholder}",
-      "visual_prompt": "Vertical 9:16 shot representing {topic} scene {i+1}, {art_style_prompt_suffix}",
-      "visual_keywords": "<1-3 concrete English physical nouns matching scene {i+1}, e.g. tiger hunting, waterfall, eagle flying>",
+      "visual_prompt": "Vertical 9:16 cinematic shot showing concrete story action of scene {i+1}, {art_style_prompt_suffix}",
+      "visual_keywords": "<2-4 concrete English physical nouns matching this exact scene's action>",
       "motion_effect": "{m}",
       "sound_effect_cue": "{s}",
       "estimated_duration": {dur_per_scene}
@@ -185,8 +185,12 @@ def build_user_prompt(
 
     prompt = f"""### YÊU CẦU BẮT BUỘC:
 Chủ đề video là: "{topic}".
-Tất cả tiêu đề, câu hook, lời thoại các cảnh và từ khóa hình ảnh PHẢI HOÀN TOÀN TẬP TRUNG VÀO CHỦ ĐỀ: "{topic}".
-TUYỆT ĐỐI KHÔNG ĐƯỢC VIẾT VỀ KIM TỰ THÁP HOẶC BẤT KỲ CHỦ ĐỀ NÀO KHÁC NGOÀI "{topic}".
+Tất cả tiêu đề, câu hook, câu chuyện kịch bản và hình ảnh PHẢI HOÀN TOÀN TẬP TRUNG VÀO: "{topic}".
+
+### NGUYÊN TẮC STORYTELLING ĐỈNH CAO (QUAN TRỌNG NHẤT):
+- KỂ CHUYỆN NHẬP VAI, KHÔNG TẢ VĂN: Xây dựng câu chuyện có diễn biến liên tục, từng cảnh là một bước phát triển hấp dẫn, lôi cuốn người nghe theo dõi đến giây cuối cùng.
+- CẤM LẶP LẠI TÊN CHỦ ĐỀ: TUYỆT ĐỐI KHÔNG lặp lại cụm từ "{topic}" trong lời thoại các cảnh thân bài! Dùng ngôn ngữ tự nhiên: "nơi này", "họ", "đoàn người", "chuyến đi định mệnh"...
+- CẤM CÂU THUYẾT MINH CHUNG CHUNG: Cấm các câu sáo rỗng như "khoa học chưa giải thích nổi", "các chuyên gia kinh ngạc". Mọi cảnh phải có chi tiết hành động hoặc sự kiện cụ thể!
 
 ### ĐỊNH HƯỚNG NỘI DUNG & PHONG CÁCH KỊCH BẢN:
 {content_directive}
@@ -194,16 +198,17 @@ TUYỆT ĐỐI KHÔNG ĐƯỢC VIẾT VỀ KIM TỰ THÁP HOẶC BẤT KỲ CH�
 ### ĐỊNH HƯỚNG PHONG CÁCH THẨM MỸ HÌNH ẢNH (ART STYLE):
 Phong cách hình ảnh áp dụng đồng bộ cho tất cả các cảnh: [{resolved_a_style}]
 Visual Prompt mỗi cảnh phải kết thúc bằng phong cách này: "{art_style_prompt_suffix}"
+Mỗi cảnh PHẢI MÔ TẢ ĐÚNG HÀNH ĐỘNG THỰC TẾ của phân cảnh đó (CẤM vẽ kính lúp bàn làm việc trừu tượng khi kể về thiên nhiên, rừng rậm hay vũ trụ).
 
 ### YÊU CẦU BẮT BUỘC VỀ BỐ CỤC 3 HỒI (MỞ BÀI - THÂN BÀI - KẾT BÀI):
 1. CẢNH 0 (scene_index: 0) - MỞ BÀI / INTRO HOOK:
-   - Lời thoại (narration) của cảnh 0 PHẢI LÀ câu Hook mở đầu cực kỳ cuốn hút, đánh thẳng vào tâm lý tò mò về "{topic}".
-   - Tuyệt đối không dùng văn mẫu sáo rỗng ("99% mọi người..."). Hãy tạo hook độc bản, tự nhiên theo chủ đề.
+   - Lời thoại (narration) của cảnh 0 PHẢI LÀ câu Hook mở đầu kích thích tò mò cực độ về câu chuyện.
+   - Tuyệt đối không dùng văn mẫu sáo rỗng ("99% mọi người...").
    - "sound_effect_cue" BẮT BUỘC là "dramatic_boom".
 2. CÁC CẢNH TIẾP THEO (scene_index: 1 đến {min_scenes-2}) - THÂN BÀI:
-   - Dẫn dắt thông tin ly kỳ, mạch truyện cuốn hút về "{topic}", chuyển cảnh liên tục mỗi 2.7 - 3.2 giây.
+   - Diễn biến dồn dập, căng thẳng leo thang, chuyển cảnh liên tục mỗi 2.7 - 3.2 giây.
 3. CẢNH CUỐI CÙNG (scene_index: {min_scenes-1}) - KẾT BÀI / OUTRO & CTA:
-   - Lời thoại (narration) của cảnh cuối cùng BẮT BUỘC là phần kết bài đúc kết và lời kêu gọi hành động (bình luận và follow kênh).
+   - Lời thoại (narration) của cảnh cuối cùng BẮT BUỘC là phần kết bài đúc kết bất ngờ và kêu gọi hành động (bình luận và follow kênh).
    - "sound_effect_cue" BẮT BUỘC là "whoosh".
 
 ### YÊU CẦU VỀ THỜI LƯỢNG VÀ SỐ LƯỢNG CẢNH (CỰC KỲ QUAN TRỌNG):
@@ -211,23 +216,23 @@ Visual Prompt mỗi cảnh phải kết thúc bằng phong cách này: "{art_sty
 - BẮT BUỘC TẠO TỪ {min_scenes} ĐẾN {max_scenes} PHÂN CẢNH (scenes) trong mảng "scenes".
 - TUYỆT ĐỐI KHÔNG ĐƯỢC TẠO DƯỚI {min_scenes} CẢNH!
 - TỔNG SỐ LƯỢNG TỪ THUYẾT MINH TOÀN BỘ KỊCH BẢN PHẢI ĐẠT: {total_words_hint} (mỗi cảnh {words_per_scene}).
-- "visual_keywords" MỖI CẢNH PHẢI LÀ 1 ĐẾN 3 TỪ KHÓA DANH TỪ CỤ THỂ BẰNG TIẾNG ANH để hệ thống tìm video/ảnh chính xác.
+- "visual_keywords" MỖI CẢNH PHẢI LÀ 2 ĐẾN 4 TỪ KHÓA DANH TỪ CỤ THỂ BẰNG TIẾNG ANH mô tả đúng hành động của cảnh đó.
 - Ngôn ngữ thuyết minh: {lang_name}
 {"- Hướng dẫn bổ sung: " + custom_instructions if custom_instructions else ""}
 
 Mẫu cấu trúc JSON bắt buộc trả về (tạo đủ từ {min_scenes} đến {max_scenes} cảnh với MỞ BÀI ở Cảnh 0 và KẾT BÀI ở Cảnh {min_scenes-1}):
 {{
-  "title": "<Tiêu đề Shorts giật gân, cuốn hút về {topic}>",
-  "description": "<Mô tả ngắn gọn, hấp dẫn về {topic}>",
+  "title": "<Tiêu đề Shorts giật gân, cuốn hút>",
+  "description": "<Mô tả ngắn gọn, hấp dẫn>",
   "hashtags": ["#shorts", "#fyp"],
-  "hook": "<Câu mở đầu sắc bén gây tò mò về {topic}>",
-  "call_to_action": "<Lời kêu gọi bình luận/theo dõi về {topic}>",
+  "hook": "<Câu mở đầu sắc bén gây tò mò>",
+  "call_to_action": "<Lời kêu gọi bình luận/theo dõi>",
   "scenes": [
 {scenes_example_str}
   ]
 }}
 
-Hãy viết kịch bản JSON hoàn chỉnh về "{topic}" với ĐỦ từ {min_scenes} đến {max_scenes} phân cảnh, CÓ MỞ BÀI VÀ KẾT BÀI RÕ RÀNG ngay bây giờ (Chỉ trả về JSON duy nhất):"""
+Hãy viết kịch bản JSON hoàn chỉnh với ĐỦ từ {min_scenes} đến {max_scenes} phân cảnh theo lối STORYTELLING LÔI CUỐN ngay bây giờ (Chỉ trả về JSON duy nhất):"""
     return prompt
 
 

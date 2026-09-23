@@ -88,11 +88,11 @@ class ScriptGenerator:
         if target_duration <= 15:
             min_scenes = 5
         elif target_duration <= 30:
-            min_scenes = 9
+            min_scenes = 8
         elif target_duration <= 45:
-            min_scenes = 14
+            min_scenes = 11
         else:
-            min_scenes = 18
+            min_scenes = 15
 
         current_count = len(script.scenes)
         if current_count >= min_scenes:
@@ -108,44 +108,73 @@ class ScriptGenerator:
         sfxs = ["suspense_riser", "whoosh", "camera_flash", "heartbeat", "clock_ticking"]
         is_en = language == "en"
 
+        variations_vi = [
+            (
+                "Ngay khoảnh khắc căng thẳng nhất, một biến cố bất ngờ xảy đến thay đổi toàn bộ cục diện.",
+                "mysterious dramatic anomaly shadows",
+                "Cinematic vertical 9:16 shot of mysterious shadows shifting across dark ominous landscape, cinematic atmospheric fog, 8k",
+            ),
+            (
+                "Những dấu vết để lại tại hiện trường khiến bất cứ ai chứng kiến cũng phải lạnh sống lưng.",
+                "strange mysterious tracks footprints terrain",
+                "Cinematic vertical 9:16 intense macro shot of strange glowing footsteps fading into dark misty soil, volumetric lighting, photorealistic",
+            ),
+            (
+                "Càng dấn sâu vào bên trong, sự im lặng rợn người dần bao trùm lấy mọi ngóc ngách.",
+                "dark eerie expanse deep mist",
+                "Cinematic vertical 9:16 wide dramatic perspective of vast shadowy terrain shrouded in thick eerie fog, cinematic suspense",
+            ),
+            (
+                "Thế nhưng, điều đáng sợ hơn cả vẫn đang âm thầm rình rập trong màn đêm vô tận.",
+                "shadowy predator silhouette glowing eyes",
+                "Cinematic vertical 9:16 suspenseful shot of glowing predator eyes gleaming within deep pitch black darkness, volumetric moonlight",
+            ),
+            (
+                "Mọi thiết bị liên lạc dường như hoàn toàn mất tín hiệu trước từ trường bí ẩn này.",
+                "glitching radio communicator device sparks",
+                "Cinematic vertical 9:16 close up of glowing glitching radio communicator device sparking in dark hand, dramatic lighting",
+            ),
+        ]
+
+        variations_en = [
+            (
+                "At the most intense moment, an unforeseen phenomenon suddenly alters everything.",
+                "mysterious anomaly atmospheric landscape",
+                "Cinematic vertical 9:16 shot of mysterious atmospheric anomaly pulsing over dark dramatic landscape, 8k",
+            ),
+            (
+                "The chilling evidence left behind leaves anyone who observes it utterly frozen in disbelief.",
+                "strange footsteps tracks dark soil",
+                "Cinematic vertical 9:16 macro shot of strange glowing tracks disappearing into misty dark earth, volumetric rim lighting",
+            ),
+            (
+                "As the journey pushes deeper into the unknown, a suffocating silence takes over the terrain.",
+                "vast foggy desolate wilderness",
+                "Cinematic vertical 9:16 wide dramatic view of vast desolate wilderness shrouded in thick rolling fog",
+            ),
+            (
+                "Yet, the most terrifying revelation is still lurking silently just beyond the visible horizon.",
+                "glowing eyes lurking dark shadows",
+                "Cinematic vertical 9:16 suspenseful framing of glowing amber eyes lurking within dense dark shadows",
+            ),
+        ]
+
         beat_idx = 0
         while len(scenes) < min_scenes:
-            # Insert between body scenes (avoid index 0 hook and last index outro)
             insert_pos = min(len(scenes) - 1, max(1, len(scenes) - 1 - (beat_idx % max(1, len(scenes) - 2))))
-            prev_scene = scenes[insert_pos - 1]
             m = motions[(len(scenes) + beat_idx) % len(motions)]
             s = sfxs[(len(scenes) + beat_idx) % len(sfxs)]
 
             if is_en:
-                context_variations = [
-                    f"Furthermore, deeper exploration of {topic} unveils even more astonishing revelations.",
-                    f"Scientists and researchers were completely stunned by what they uncovered about {topic}.",
-                    f"Every single detail reveals an entirely different perspective on {topic}.",
-                    f"Evidence clearly demonstrates the relentless and mysterious power behind {topic}.",
-                    f"This crucial insight fundamentally changes everything we thought we knew about {topic}.",
-                ]
-                new_narr = context_variations[beat_idx % len(context_variations)]
-                new_prompt = f"Cinematic vertical 9:16 macro dramatic shot of {topic}, photorealistic 8k, epic volumetric lighting"
-                new_kw = prev_scene.visual_keywords or f"{topic} mystery"
+                narr, kw, prompt = variations_en[beat_idx % len(variations_en)]
             else:
-                context_variations = [
-                    f"Không dừng lại ở đó, những nghiên cứu sâu hơn về {topic} còn hé lộ sự thật không ngờ.",
-                    f"Các chuyên gia đã vô cùng kinh ngạc trước những hiện tượng kỳ lạ diễn ra tại {topic}.",
-                    f"Từng chi tiết được bóc tách cho thấy bức tranh hoàn toàn khác biệt về {topic}.",
-                    f"Những bằng chứng thực tế chứng minh quy luật khắc nghiệt và kỳ bí của {topic}.",
-                    f"Đây chính là yếu tố làm thay đổi toàn bộ góc nhìn của chúng ta về {topic}.",
-                    f"Nhiều tài liệu lịch sử và khoa học đã ghi nhận những điều phi thường về {topic}.",
-                    f"Sự kỳ diệu này khiến bất cứ ai từng chứng kiến {topic} đều không khỏi trầm trồ.",
-                ]
-                new_narr = context_variations[beat_idx % len(context_variations)]
-                new_prompt = f"Cinematic vertical 9:16 dramatic scene detailing {topic}, photorealistic 8k, epic volumetric lighting"
-                new_kw = prev_scene.visual_keywords or f"{topic} discovery"
+                narr, kw, prompt = variations_vi[beat_idx % len(variations_vi)]
 
             new_scene = SceneSchema(
                 scene_index=len(scenes),
-                narration=new_narr,
-                visual_prompt=new_prompt,
-                visual_keywords=new_kw,
+                narration=narr,
+                visual_prompt=prompt,
+                visual_keywords=kw,
                 motion_effect=m,
                 sound_effect_cue=s,
                 estimated_duration=round(target_duration / min_scenes, 1),

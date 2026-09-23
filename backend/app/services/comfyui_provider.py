@@ -290,42 +290,61 @@ class ComfyUIProvider:
         """
         Generates hyper-realistic, photorealistic or stylized 9:16 vertical artwork using Flux.1 Schnell via Pollinations.ai.
         100% free, zero API key required, fast (2-4 seconds).
-        Anchors generation strictly to video topic and visual art style with unique per-scene seeds.
+        Anchors generation strictly to clean English story prompts and art style with unique per-scene seeds.
+        Includes fast fallback to model=turbo (SDXL Turbo) if flux server is busy.
         """
         from app.orchestrator.prompt_templates import resolve_art_style, ART_STYLE_DIRECTIVES
 
+        # 1. Clean the English prompt: strip boilerplate and any non-ASCII characters
         clean_p = re.sub(
-            r"^(Cinematic|Vertical|Horizontal|9:16|Shot of|Photo of|A photo of)\s*",
+            r"^(Cinematic|Vertical|Horizontal|9:16|Shot of|Photo of|A photo of|Scene representing)\s*(vertical)?\s*(9:16)?\s*",
             "",
             prompt,
             flags=re.IGNORECASE,
         ).strip()
-        topic_prefix = f"Topic '{topic.strip()}': " if topic and topic.strip() else ""
+        # Remove any non-ASCII / Vietnamese characters that confuse Flux CLIP text encoder
+        clean_p = re.sub(r"[^\x00-\x7F]+", " ", clean_p).strip()
+        clean_p = re.sub(r"\s+", " ", clean_p)
 
         resolved_style = resolve_art_style(topic or "", art_style or "auto")
         style_directive = ART_STYLE_DIRECTIVES.get(resolved_style, ART_STYLE_DIRECTIVES["cinematic"])
 
+        # If topic is pure English, we can include it as prefix; otherwise omit non-English topic
+        topic_clean_en = ""
+        if topic and not any(ord(c) > 127 for c in topic):
+            topic_clean_en = f"{topic.strip()}, "
+
         enhanced_prompt = (
-            f"{topic_prefix}{clean_p}, {style_directive}, vertical 9:16 composition, masterpiece, ultra-detailed"
+            f"{topic_clean_en}{clean_p}, {style_directive}, vertical 9:16 composition, photorealistic, 8k resolution, masterpiece"
         )
         encoded = urllib.parse.quote(enhanced_prompt)
         seed = (random.randint(100000, 9000000) + (scene_index + 1) * 31337 + abs(hash(prompt)) % 10000) % 10000000
-        url = f"https://image.pollinations.ai/prompt/{encoded}?width=720&height=1280&model=flux&nologo=true&seed={seed}"
 
-        try:
-            logger.info(
-                f"Calling Tier 1 [Flux.1 AI] for scene {scene_index} (art_style={resolved_style}, seed={seed})..."
-            )
-            async with httpx.AsyncClient(timeout=40.0, follow_redirects=True) as client:
-                res = await client.get(url)
-                if res.status_code == 200 and len(res.content) > 15_000:
-                    raw_img = Image.open(io.BytesIO(res.content)).convert("RGB")
-                    processed = self._crop_and_enhance_to_vertical(raw_img, target_w, target_h)
-                    processed.save(output_path, "JPEG", quality=95)
-                    logger.info(f"Tier 1 [Flux.1 AI - {resolved_style}] generated successfully: {output_path} ({processed.size})")
-                    return output_path
-        except Exception as e:
-            logger.warning(f"Tier 1 [Flux.1 AI] failed ({e}), falling back to web photographic search...")
+        # Try Primary: Flux.1 Schnell, Fallback: Turbo (SDXL Turbo 1s)
+        models_to_try = [
+            ("flux", 25.0),
+            ("turbo", 15.0),
+        ]
+
+        for model_name, timeout_sec in models_to_try:
+            url = f"https://image.pollinations.ai/prompt/{encoded}?width=720&height=1280&model={model_name}&nologo=true&seed={seed}"
+            try:
+                logger.info(
+                    f"Calling Tier 1 [{model_name.upper()} AI] for scene {scene_index} (art_style={resolved_style}, seed={seed})..."
+                )
+                async with httpx.AsyncClient(timeout=timeout_sec, follow_redirects=True) as client:
+                    res = await client.get(url)
+                    if res.status_code == 200 and len(res.content) > 15_000:
+                        raw_img = Image.open(io.BytesIO(res.content)).convert("RGB")
+                        processed = self._crop_and_enhance_to_vertical(raw_img, target_w, target_h)
+                        processed.save(output_path, "JPEG", quality=95)
+                        logger.info(
+                            f"Tier 1 [{model_name.upper()} AI - {resolved_style}] generated successfully: {output_path} ({processed.size})"
+                        )
+                        return output_path
+            except Exception as e:
+                logger.warning(f"Tier 1 [{model_name.upper()} AI] attempt failed ({e}), trying next fallback...")
+
         return None
 
     async def _search_pexels_photo(
@@ -612,42 +631,31 @@ class ComfyUIProvider:
         if keywords and keywords.strip():
             clean_kw = re.sub(r'["\',;.]', ' ', keywords).strip()
 
-        # 4. Construct topic-anchored queries
-        if clean_topic:
-            # A. Topic + concrete keywords
+        # 4. Construct topic-anchored queries (Pure English for image and video search)
+        topic_is_ascii = clean_topic and not any(ord(c) > 127 for c in clean_topic)
+        if topic_is_ascii:
+            # Safe to prepend English topic
             if clean_kw:
                 if clean_topic.lower() in clean_kw.lower():
                     queries.append(clean_kw)
                 else:
                     queries.append(f"{clean_topic} {clean_kw}")
+                    queries.append(clean_kw)
 
                 words = [w for w in clean_kw.split() if len(w) > 2]
                 if len(words) >= 2:
                     short_kw = " ".join(words[:2])
-                    if clean_topic.lower() not in short_kw.lower():
-                        queries.append(f"{clean_topic} {short_kw}")
-                    else:
-                        queries.append(short_kw)
+                    queries.append(short_kw)
 
-            # B. Topic + prompt subject
             if clean_prompt_subject:
-                if clean_topic.lower() in clean_prompt_subject.lower():
-                    queries.append(clean_prompt_subject)
-                else:
+                if clean_topic.lower() not in clean_prompt_subject.lower():
                     queries.append(f"{clean_topic} {clean_prompt_subject}")
-
-            # C. Topic alone
-            queries.append(clean_topic)
-
-            # D. Secondary prompt subject (if strong English phrase >= 2 words)
-            if clean_prompt_subject and len(clean_prompt_subject.split()) >= 2:
                 queries.append(clean_prompt_subject)
 
-            # E. Secondary clean keywords (if multi-word phrase)
-            if clean_kw and len(clean_kw.split()) >= 2:
-                queries.append(clean_kw)
+            queries.append(clean_topic)
         else:
-            # Fallback when topic is absent
+            # Topic is non-English (e.g. Vietnamese) -> Strictly rely on clean English keywords & prompt subject
+            # Never prepend Vietnamese phrases into global English image search engines!
             if clean_kw:
                 queries.append(clean_kw)
                 words = [w for w in clean_kw.split() if len(w) > 2]
@@ -681,14 +689,21 @@ class ComfyUIProvider:
         Queries global web photographic index (Google / Bing web image search index)
         for real, authentic high-resolution photos matching the scene context.
         Prioritizes tall/portrait 9:16 images, then large 4K/HD images.
-        Deduplicates against previously used visual assets.
+        Strictly blacklists presentation slides, powerpoints, cliparts and icons.
         """
         search_candidates = self._extract_search_queries(keywords, prompt, narration, topic=topic)
         headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
             "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
-            "Accept-Language": "en-US,en;q=0.9,vi;q=0.8",
+            "Accept-Language": "en-US,en;q=0.9",
         }
+
+        blacklisted_patterns = [
+            "powerpoint", "thuthuat", "slide", "template", "vector", "clipart",
+            "icon", "logo", "banner", "hinh-nen-powerpoint", "avatar", "shopee",
+            "lazada", "facebook", "tiktok", "instagram", "pinterest", "meme",
+            "drawing", "sketch", "infographic", "thiet-ke", "background-powerpoint"
+        ]
 
         async with httpx.AsyncClient(headers=headers, timeout=12.0, follow_redirects=True) as client:
             for query in search_candidates[:4]:
@@ -712,6 +727,9 @@ class ComfyUIProvider:
                                 murls = re.findall(r'"murl":"(https?://[^"]+)"', res.text)
                             for u in murls:
                                 clean_u = urllib.parse.unquote(u)
+                                clean_lower = clean_u.lower()
+                                if any(bp in clean_lower for bp in blacklisted_patterns):
+                                    continue
                                 ext = Path(clean_u.split('?')[0]).suffix.lower()
                                 if ext in ['.jpg', '.jpeg', '.png', '.webp'] or not ext:
                                     if clean_u not in candidate_urls and clean_u not in self._used_asset_signatures:
@@ -727,10 +745,10 @@ class ComfyUIProvider:
                         continue
                     try:
                         dl = await client.get(img_url, timeout=8.0)
-                        if dl.status_code == 200 and len(dl.content) > 20_000:
+                        if dl.status_code == 200 and len(dl.content) > 30_000:
                             raw_img = Image.open(io.BytesIO(dl.content)).convert("RGB")
                             w, h = raw_img.size
-                            if w >= 450 and h >= 450:
+                            if w >= 500 and h >= 500:
                                 processed = self._crop_and_enhance_to_vertical(raw_img, target_w, target_h)
                                 processed.save(output_path, "JPEG", quality=95)
                                 self._used_asset_signatures.add(img_url)
