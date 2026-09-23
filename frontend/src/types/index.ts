@@ -24,6 +24,8 @@ export interface Project {
   language: string;
   status: string;
   brand_kit_id?: string;
+  art_style?: string;
+  content_style?: string;
   seo_title?: string;
   seo_description?: string;
   hashtags?: string[];

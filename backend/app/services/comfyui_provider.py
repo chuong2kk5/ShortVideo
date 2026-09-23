@@ -108,6 +108,7 @@ class ComfyUIProvider:
         prefer_video: bool = True,
         topic: Optional[str] = None,
         scene_index: int = 0,
+        art_style: Optional[str] = "auto",
     ) -> Path:
         """
         Universal visual asset generator:
@@ -126,6 +127,7 @@ class ComfyUIProvider:
                     narration=narration,
                     topic=topic,
                     scene_index=scene_index,
+                    art_style=art_style,
                 )
                 if vid_path and vid_path.exists() and vid_path.stat().st_size > 100_000:
                     logger.info(f"Using moving stock video asset: {vid_path}")
@@ -144,6 +146,7 @@ class ComfyUIProvider:
             narration=narration,
             topic=topic,
             scene_index=scene_index,
+            art_style=art_style,
         )
 
     async def find_stock_video_clip(
@@ -154,6 +157,7 @@ class ComfyUIProvider:
         narration: Optional[str] = None,
         topic: Optional[str] = None,
         scene_index: int = 0,
+        art_style: Optional[str] = "auto",
     ) -> Optional[Path]:
         """
         Searches for and downloads authentic moving video footage (.webm, .mp4)
@@ -281,12 +285,15 @@ class ComfyUIProvider:
         target_h: int = 1920,
         topic: Optional[str] = None,
         scene_index: int = 0,
+        art_style: Optional[str] = "auto",
     ) -> Optional[Path]:
         """
-        Generates hyper-realistic, photorealistic 9:16 vertical artwork using Flux.1 Schnell via Pollinations.ai.
+        Generates hyper-realistic, photorealistic or stylized 9:16 vertical artwork using Flux.1 Schnell via Pollinations.ai.
         100% free, zero API key required, fast (2-4 seconds).
-        Anchors generation strictly to video topic with unique per-scene seeds to prevent repetition.
+        Anchors generation strictly to video topic and visual art style with unique per-scene seeds.
         """
+        from app.orchestrator.prompt_templates import resolve_art_style, ART_STYLE_DIRECTIVES
+
         clean_p = re.sub(
             r"^(Cinematic|Vertical|Horizontal|9:16|Shot of|Photo of|A photo of)\s*",
             "",
@@ -294,23 +301,28 @@ class ComfyUIProvider:
             flags=re.IGNORECASE,
         ).strip()
         topic_prefix = f"Topic '{topic.strip()}': " if topic and topic.strip() else ""
+
+        resolved_style = resolve_art_style(topic or "", art_style or "auto")
+        style_directive = ART_STYLE_DIRECTIVES.get(resolved_style, ART_STYLE_DIRECTIVES["cinematic"])
+
         enhanced_prompt = (
-            f"{topic_prefix}{clean_p}, cinematic dramatic lighting, photorealistic 8k, hyper-detailed masterpiece, "
-            f"award winning national geographic photography, vertical 9:16 composition, unreal engine 5 render"
+            f"{topic_prefix}{clean_p}, {style_directive}, vertical 9:16 composition, masterpiece, ultra-detailed"
         )
         encoded = urllib.parse.quote(enhanced_prompt)
         seed = (random.randint(100000, 9000000) + (scene_index + 1) * 31337 + abs(hash(prompt)) % 10000) % 10000000
         url = f"https://image.pollinations.ai/prompt/{encoded}?width=720&height=1280&model=flux&nologo=true&seed={seed}"
 
         try:
-            logger.info(f"Calling Tier 1 [Flux.1 Photorealistic AI] for scene {scene_index} 9:16 masterpiece artwork (seed={seed})...")
+            logger.info(
+                f"Calling Tier 1 [Flux.1 AI] for scene {scene_index} (art_style={resolved_style}, seed={seed})..."
+            )
             async with httpx.AsyncClient(timeout=40.0, follow_redirects=True) as client:
                 res = await client.get(url)
                 if res.status_code == 200 and len(res.content) > 15_000:
                     raw_img = Image.open(io.BytesIO(res.content)).convert("RGB")
                     processed = self._crop_and_enhance_to_vertical(raw_img, target_w, target_h)
                     processed.save(output_path, "JPEG", quality=95)
-                    logger.info(f"Tier 1 [Flux.1 Photorealistic AI] generated successfully: {output_path} ({processed.size})")
+                    logger.info(f"Tier 1 [Flux.1 AI - {resolved_style}] generated successfully: {output_path} ({processed.size})")
                     return output_path
         except Exception as e:
             logger.warning(f"Tier 1 [Flux.1 AI] failed ({e}), falling back to web photographic search...")
@@ -326,6 +338,7 @@ class ComfyUIProvider:
         target_h: int = 1920,
         topic: Optional[str] = None,
         scene_index: int = 0,
+        art_style: Optional[str] = "auto",
     ) -> Optional[Path]:
         """
         Queries Pexels Photo API for authentic 4K/FullHD portrait photography
@@ -384,11 +397,12 @@ class ComfyUIProvider:
         narration: Optional[str] = None,
         topic: Optional[str] = None,
         scene_index: int = 0,
+        art_style: Optional[str] = "auto",
     ) -> Path:
         """
         Executes tiered visual generation:
         0. Pexels Photo API (When PEXELS_API_KEY is configured in .env)
-        1. Flux.1 Photorealistic AI (Pollinations.ai - 100% Free, Zero Key, 9:16 Masterpiece)
+        1. Flux.1 Photorealistic / Stylized AI (Pollinations.ai - 100% Free, Zero Key, 9:16 Masterpiece)
         2. Web Photographic Engine (Google / Bing global web index for authentic photos matching topic)
         3. Semantic Photographic Matcher (Wikimedia Commons 100M+ high-res photos)
         4. Google Imagen 3 (Gemini API Key)
@@ -412,6 +426,7 @@ class ComfyUIProvider:
                     target_h=height,
                     topic=topic,
                     scene_index=scene_index,
+                    art_style=art_style,
                 )
                 if pexels_img and pexels_img.exists() and pexels_img.stat().st_size > 10000:
                     logger.info(f"Tier 0 [Pexels Photo API] successfully retrieved: {output_path}")
@@ -430,6 +445,7 @@ class ComfyUIProvider:
                 target_h=height,
                 topic=topic,
                 scene_index=scene_index,
+                art_style=art_style,
             )
             if flux_img and flux_img.exists() and flux_img.stat().st_size > 10000:
                 return flux_img
@@ -477,6 +493,7 @@ class ComfyUIProvider:
                 return photo_path
         except Exception as e:
             logger.warning(f"Tier 3 [Wikimedia Matcher] failed: {e}")
+
 
         # ------------------------------------------------------------------
         # TIER 4: Google Imagen 3 (Gemini API Key)

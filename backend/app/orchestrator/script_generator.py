@@ -31,9 +31,14 @@ class ScriptGenerator:
             language=request.language,
             target_duration=request.target_duration,
             custom_instructions=request.custom_instructions or "",
+            content_style=getattr(request, "content_style", "auto"),
+            art_style=getattr(request, "art_style", "auto"),
         )
 
-        logger.info(f"Starting script generation for topic: '{request.topic}'...")
+        logger.info(
+            f"Starting script generation for topic: '{request.topic}' "
+            f"(content_style={getattr(request, 'content_style', 'auto')}, art_style={getattr(request, 'art_style', 'auto')})..."
+        )
 
         # Sequential Memory Guard Stage
         async with memory_guard.stage("script_generation"):
@@ -171,12 +176,15 @@ class ScriptGenerator:
         hook_text = (script.hook or "").strip()
         if hook_text:
             s0_narr = (s0.narration or "").strip()
-            hook_lower = hook_text.lower()
-            if hook_lower not in s0_narr.lower():
-                if len(s0_narr.split()) > 15:
-                    s0.narration = hook_text
+            hook_lower = hook_text.lower().rstrip(".!?")
+            s0_lower = s0_narr.lower().rstrip(".!?")
+            if hook_lower in s0_lower or s0_lower in hook_lower:
+                s0.narration = s0_narr or hook_text
+            else:
+                if len(s0_narr.split()) <= 7:
+                    s0.narration = f"{hook_text.rstrip('.!?')}. {s0_narr}".strip()
                 else:
-                    s0.narration = f"{hook_text} {s0_narr}".strip()
+                    s0.narration = hook_text
 
         # 2. Enforce Scene N-1 Outro & CTA (Kết bài)
         s_last = script.scenes[-1]

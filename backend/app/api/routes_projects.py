@@ -26,6 +26,8 @@ async def create_project(payload: ProjectCreate, db: AsyncSession = Depends(get_
         aspect_ratio=payload.aspect_ratio,
         language=payload.language,
         brand_kit_id=payload.brand_kit_id,
+        art_style=payload.art_style or "auto",
+        content_style=payload.content_style or "auto",
         status="draft",
     )
     db.add(project)

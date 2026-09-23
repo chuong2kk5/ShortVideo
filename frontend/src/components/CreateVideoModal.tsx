@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Sparkles, Mic, Clock, Globe, Wand2, Loader2, Volume2, Square, Radio } from 'lucide-react';
+import { X, Sparkles, Mic, Clock, Globe, Wand2, Loader2, Volume2, Square, Radio, Palette, BookOpen } from 'lucide-react';
 import { BrandKit, VoiceProfile, DEFAULT_VOICE_CATALOG } from '../types';
 import { useAudioPreview } from '../hooks/useAudioPreview';
 
@@ -13,6 +13,8 @@ interface CreateVideoModalProps {
     duration: number;
     voice: string;
     brandKitId?: string;
+    artStyle?: string;
+    contentStyle?: string;
   }) => Promise<void>;
 }
 
@@ -26,6 +28,8 @@ export const CreateVideoModal: React.FC<CreateVideoModalProps> = ({
   const [language, setLanguage] = useState('vi');
   const [duration, setDuration] = useState(30);
   const [voice, setVoice] = useState('vi-VN-NamMinhNeural');
+  const [artStyle, setArtStyle] = useState('auto');
+  const [contentStyle, setContentStyle] = useState('auto');
   const [brandKitId, setBrandKitId] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [voices, setVoices] = useState<VoiceProfile[]>(DEFAULT_VOICE_CATALOG);
@@ -85,6 +89,8 @@ export const CreateVideoModal: React.FC<CreateVideoModalProps> = ({
         duration,
         voice,
         brandKitId: brandKitId || undefined,
+        artStyle,
+        contentStyle,
       });
       handleClose();
     } catch (err) {
@@ -174,6 +180,46 @@ export const CreateVideoModal: React.FC<CreateVideoModalProps> = ({
               >
                 <option value="vi">Tiếng Việt (Tự nhiên, lôi cuốn)</option>
                 <option value="en">English (Global Viral Reach)</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Content Style & Art Style Presets */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 mb-1.5 flex items-center gap-1.5">
+                <BookOpen className="w-3.5 h-3.5 text-amber-400" />
+                Mô Thức Kịch Bản
+              </label>
+              <select
+                value={contentStyle}
+                onChange={(e) => setContentStyle(e.target.value)}
+                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-slate-200 outline-none focus:border-emerald-500"
+              >
+                <option value="auto">🤖 Tự động phân tích (Khuyên dùng)</option>
+                <option value="storytelling_drama">🎭 Kể chuyện & Kịch tính (Drama)</option>
+                <option value="top_facts">📊 Top Fact / Bảng xếp hạng</option>
+                <option value="mystery_curiosity">🕵️ Bí ẩn & Kích thích tò mò</option>
+                <option value="educational">💡 Giải thích & Kiến thức hữu ích</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 mb-1.5 flex items-center gap-1.5">
+                <Palette className="w-3.5 h-3.5 text-pink-400" />
+                Phong Cách Hình Ảnh (Visual)
+              </label>
+              <select
+                value={artStyle}
+                onChange={(e) => setArtStyle(e.target.value)}
+                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-slate-200 outline-none focus:border-emerald-500"
+              >
+                <option value="auto">✨ AI Đồng bộ theo kịch bản</option>
+                <option value="cinematic">🎬 Điện ảnh chân thực (Cinematic)</option>
+                <option value="3d_animation">🧸 Hoạt hình 3D Pixar sắc nét</option>
+                <option value="anime_ghibli">🎨 Anime Ghibli / Manga sống động</option>
+                <option value="dark_mystery">🌑 Rùng rợn & Bí ẩn (Dark Noir)</option>
+                <option value="historic_painting">🏛️ Tranh sơn dầu phục hưng cổ điển</option>
               </select>
             </div>
           </div>

@@ -149,6 +149,8 @@ class PipelineRunner:
                         language=project.language,
                         target_duration=project.target_duration,
                         brand_kit_id=project.brand_kit_id,
+                        content_style=getattr(project, "content_style", "auto"),
+                        art_style=getattr(project, "art_style", "auto"),
                     )
 
                     script = await script_generator.generate_script(script_req)
@@ -227,6 +229,7 @@ class PipelineRunner:
                             prefer_video=True,
                             topic=proj.topic,
                             scene_index=idx,
+                            art_style=getattr(proj, "art_style", "auto"),
                         )
                         sc.image_path = str(asset_path)
                         sc.status = "image_ready"

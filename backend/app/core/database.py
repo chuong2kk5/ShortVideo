@@ -63,3 +63,15 @@ async def init_db() -> None:
         except Exception:
             pass  # Column already exists
 
+        try:
+            from sqlalchemy import text
+            await conn.execute(text("ALTER TABLE projects ADD COLUMN art_style VARCHAR(32) DEFAULT 'auto'"))
+        except Exception:
+            pass
+
+        try:
+            from sqlalchemy import text
+            await conn.execute(text("ALTER TABLE projects ADD COLUMN content_style VARCHAR(32) DEFAULT 'auto'"))
+        except Exception:
+            pass
+

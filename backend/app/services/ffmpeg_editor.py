@@ -123,9 +123,10 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
         if scene_word_cues:
             # Chunk into phrases of 3 words for modern high-retention readability
             chunk_size = 3
-            for i in range(0, len(scene_word_cues), chunk_size):
+            total_chunks = (len(scene_word_cues) + chunk_size - 1) // chunk_size
+            for chunk_idx, i in enumerate(range(0, len(scene_word_cues), chunk_size)):
                 chunk = scene_word_cues[i : i + chunk_size]
-                # For each word in the chunk, generate a highlighted dialogue line
+                # For each word in the chunk, generate a highlighted dialogue line with CapCut bounce
                 for w_idx, active_item in enumerate(chunk):
                     w_start = active_item.get("start", 0.0)
                     w_end = active_item.get("end", w_start + 0.3)
@@ -136,14 +137,19 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                     for j, c in enumerate(chunk):
                         word_str = c.get("word", "").upper()
                         if j == w_idx:
-                            # Highlight currently spoken word in vivid yellow
-                            formatted_words.append(f"{{\\c{highlight_color}&}}{word_str}{{\\c{primary_color}&}}")
+                            # Highlight currently spoken word in vivid neon yellow with CapCut Pop Bounce
+                            formatted_words.append(
+                                f"{{\\c{highlight_color}&\\t(0,70,\\fscx116\\fscy116)\\t(70,140,\\fscx100\\fscy100)}}{word_str}{{\\c{primary_color}&}}"
+                            )
                         else:
                             formatted_words.append(word_str)
 
                     start_time = self.format_ass_timestamp(w_start)
                     end_time = self.format_ass_timestamp(w_end)
                     text = " ".join(formatted_words)
+                    # Add subtle emoji spark on the first chunk of video to stop scroll
+                    if chunk_idx == 0 and w_idx == 0:
+                        text = f"⚡ {text}"
                     events.append(f"Dialogue: 0,{start_time},{end_time},ShortsStyle,,0,0,0,,{text}")
 
         ass_content = header + "\n".join(events) + "\n"
@@ -260,17 +266,17 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
             p = f"(on/{total_frames})"
 
             if motion_effect == "zoom_out":
-                zoom_expr = f"z='max(1.22 - {p}*0.20, 1.01)':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)'"
+                zoom_expr = f"z='max(1.25 - (1-exp(-3.5*{p}))*0.16 - {p}*0.06, 1.01)':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)'"
             elif motion_effect == "pan_left":
-                zoom_expr = f"z='1.18':x='(1.0 - {p})*(iw-iw/zoom)':y='ih/2-(ih/zoom/2)'"
+                zoom_expr = f"z='1.16':x='(1.0 - (1-exp(-3.0*{p}))*0.8 - {p}*0.2)*(iw-iw/zoom)':y='ih/2-(ih/zoom/2)'"
             elif motion_effect == "pan_right":
-                zoom_expr = f"z='1.18':x='({p})*(iw-iw/zoom)':y='ih/2-(ih/zoom/2)'"
+                zoom_expr = f"z='1.16':x='((1-exp(-3.0*{p}))*0.8 + {p}*0.2)*(iw-iw/zoom)':y='ih/2-(ih/zoom/2)'"
             elif motion_effect in ["drift", "ken_burns"]:
-                zoom_expr = f"z='1.05 + {p}*0.14':x='({p})*(iw-iw/zoom)':y='(1.0 - {p})*(ih-ih/zoom)'"
+                zoom_expr = f"z='1.04 + {p}*0.14':x='({p})*(iw-iw/zoom)':y='(1.0 - {p})*(ih-ih/zoom)'"
             elif motion_effect == "shake":
-                zoom_expr = f"z='1.12':x='iw/2-(iw/zoom/2)+sin(on*0.25)*10':y='ih/2-(ih/zoom/2)+cos(on*0.2)*10'"
-            else:  # zoom_in (default)
-                zoom_expr = f"z='min(1.0 + {p}*0.20, 1.26)':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)'"
+                zoom_expr = f"z='1.12':x='iw/2-(iw/zoom/2)+sin(on*0.45)*8':y='ih/2-(ih/zoom/2)+cos(on*0.35)*8'"
+            else:  # zoom_in (default with Camera Punch)
+                zoom_expr = f"z='min(1.03 + (1-exp(-3.5*{p}))*0.15 + {p}*0.06, 1.28)':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)'"
 
             # Scale to 1440x2560 canvas to ensure razor sharp 1080x1920 Ken Burns output without blurry bars
             v_filter = (
@@ -396,11 +402,16 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
             h, m, s = match_dur.groups()
             total_dur = round(int(h) * 3600 + int(m) * 60 + float(s), 2)
 
-        # 2. Add BGM and Burn Subtitles
+        # 2. Add Cinematic Color Grading, Vignette, BGM and Burn Subtitles
         has_sub = ass_subtitle_path and ass_subtitle_path.exists()
         has_bgm = bgm_path and bgm_path.exists()
 
         filter_parts = []
+
+        # Cinematic color grading & subtle vignette (Harmonizes visual tones across all scenes)
+        filter_parts.append("eq=contrast=1.05:saturation=1.10:brightness=0.01")
+        filter_parts.append("vignette=PI/4:eval=frame")
+
         if has_sub:
             escaped_sub = str(ass_subtitle_path.resolve()).replace("\\", "/").replace(":", "\\:")
             filter_parts.append(f"subtitles='{escaped_sub}'")

@@ -134,6 +134,8 @@ export const App: React.FC = () => {
     duration: number;
     voice: string;
     brandKitId?: string;
+    artStyle?: string;
+    contentStyle?: string;
   }) => {
     // 1. Create Project
     const projRes = await fetch('/api/projects', {
@@ -145,6 +147,8 @@ export const App: React.FC = () => {
         language: data.language,
         target_duration: data.duration,
         brand_kit_id: data.brandKitId,
+        art_style: data.artStyle || 'auto',
+        content_style: data.contentStyle || 'auto',
       }),
     });
     const newProject = await projRes.json();

@@ -69,6 +69,8 @@ class ScriptGenerateRequest(BaseModel):
     language: str = Field(default="vi", description="Language of the narration ('vi' or 'en')")
     target_duration: int = Field(default=30, ge=15, le=90, description="Target duration in seconds")
     brand_kit_id: Optional[str] = Field(default=None, description="Optional Brand Kit ID to inherit style")
+    art_style: Optional[str] = Field(default="auto", description="Visual art style preset: auto, cinematic, 3d_animation, anime_ghibli, dark_mystery, historic_painting")
+    content_style: Optional[str] = Field(default="auto", description="Content narrative archetype: auto, storytelling_drama, top_facts, mystery_curiosity, educational")
     custom_instructions: Optional[str] = Field(
         default=None, description="Additional custom instructions or constraints for the script"
     )
@@ -112,6 +114,8 @@ class ProjectCreate(BaseModel):
     aspect_ratio: str = "9:16"
     language: str = "vi"
     brand_kit_id: Optional[str] = None
+    art_style: Optional[str] = "auto"
+    content_style: Optional[str] = "auto"
 
 
 class ProjectResponse(BaseModel):
@@ -125,6 +129,8 @@ class ProjectResponse(BaseModel):
     language: str
     status: str
     brand_kit_id: Optional[str]
+    art_style: Optional[str] = "auto"
+    content_style: Optional[str] = "auto"
     seo_title: Optional[str]
     seo_description: Optional[str]
     hashtags: List[str] = []

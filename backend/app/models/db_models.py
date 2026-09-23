@@ -35,6 +35,8 @@ class Project(Base):
     language = Column(String(16), default="vi")  # 'vi', 'en', etc.
     status = Column(String(32), default="draft")  # draft, generating_script, ready_to_render, rendering, completed, failed
     brand_kit_id = Column(String(36), ForeignKey("brand_kit_presets.id", ondelete="SET NULL"), nullable=True)
+    art_style = Column(String(32), default="auto")
+    content_style = Column(String(32), default="auto")
 
     seo_title = Column(String(255), nullable=True)
     seo_description = Column(Text, nullable=True)
