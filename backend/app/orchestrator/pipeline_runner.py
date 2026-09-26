@@ -75,11 +75,13 @@ class PipelineRunner:
         combined = f"{topic or ''} {title or ''}".lower()
         music_dir = BASE_DIR.parent / "assets" / "music_library"
 
-        # 1. Energetic / Modern / Upbeat
+        # 1. Energetic / Modern / Upbeat / E-Commerce Product Review
         if any(w in combined for w in [
             "xe", "car", "siêu xe", "supercar", "công nghệ", "tech", "tiền", "money",
             "giàu", "thành công", "động lực", "thể thao", "sport", "gym", "tỷ phú",
-            "robot", "tương lai", "chiến", "kinh doanh", "startup"
+            "robot", "tương lai", "chiến", "kinh doanh", "startup", "review", "sản phẩm",
+            "quần áo", "áo", "quần", "váy", "đầm", "giày", "túi", "phụ kiện", "đồng hồ",
+            "mỹ phẩm", "kem", "son", "deal", "giỏ hàng", "mua", "sale", "shopee", "tiktok", "unbox"
         ]):
             p = music_dir / "energetic_beat.wav"
             if p.exists():
@@ -127,52 +129,75 @@ class PipelineRunner:
             # -------------------------------------------------------------
             # STAGE 1: SCRIPT GENERATION (LLM)
             # -------------------------------------------------------------
-            async with resource_manager.guard_stage("script_generation"):
+            async with AsyncSessionLocal() as session:
+                proj_res = await session.execute(
+                    select(Project).where(Project.id == project_id).options(selectinload(Project.scenes))
+                )
+                project = proj_res.scalar_one_or_none()
+                if not project:
+                    raise ValueError("Project not found.")
+
+                has_pregenerated_scenes = len(project.scenes) > 0 and project.status in ["ready_to_render", "product_review"]
+
+            if has_pregenerated_scenes:
                 await self.log_job_event(
                     job_id=job_id,
                     stage="script_generation",
-                    message="AI đang phân tích chủ đề và thiết kế kịch bản Shorts 3 hồi...",
-                    progress=10.0,
+                    message=f"Đã có sẵn kịch bản review sản phẩm: '{project.title}' ({len(project.scenes)} phân cảnh kèm ảnh mẫu thật).",
+                    progress=25.0,
                     extra_data={
-                        "action": "brainstorming",
+                        "action": "script_ready",
+                        "title": project.title,
+                        "total_scenes": len(project.scenes),
                     },
                 )
-
-                async with AsyncSessionLocal() as session:
-                    proj_res = await session.execute(select(Project).where(Project.id == project_id))
-                    project = proj_res.scalar_one_or_none()
-                    if not project:
-                        raise ValueError("Project not found.")
-
-                    script_req = ScriptGenerateRequest(
-                        topic=project.topic,
-                        language=project.language,
-                        target_duration=project.target_duration,
-                        brand_kit_id=project.brand_kit_id,
-                        content_style=getattr(project, "content_style", "auto"),
-                        art_style=getattr(project, "art_style", "auto"),
+            else:
+                async with resource_manager.guard_stage("script_generation"):
+                    await self.log_job_event(
+                        job_id=job_id,
+                        stage="script_generation",
+                        message="AI đang phân tích chủ đề và thiết kế kịch bản Shorts 3 hồi...",
+                        progress=10.0,
+                        extra_data={
+                            "action": "brainstorming",
+                        },
                     )
 
-                    script = await script_generator.generate_script(script_req)
-                    await script_generator.save_script_to_project(session, project_id, script)
+                    async with AsyncSessionLocal() as session:
+                        proj_res = await session.execute(select(Project).where(Project.id == project_id))
+                        project = proj_res.scalar_one_or_none()
+                        if not project:
+                            raise ValueError("Project not found.")
 
-            await self.log_job_event(
-                job_id=job_id,
-                stage="script_generation",
-                message=f"Đã hoàn thành kịch bản: '{script.title}' gồm {len(script.scenes)} phân cảnh.",
-                progress=25.0,
-                extra_data={
-                    "action": "script_ready",
-                    "title": script.title,
-                    "hook": script.hook,
-                    "cta": script.call_to_action,
-                    "total_scenes": len(script.scenes),
-                    "scenes_summary": [
-                        {"index": i, "narration": getattr(s, "narration", getattr(s, "narration_text", "")), "keywords": getattr(s, "visual_keywords", "")}
-                        for i, s in enumerate(script.scenes)
-                    ],
-                },
-            )
+                        script_req = ScriptGenerateRequest(
+                            topic=project.topic,
+                            language=project.language,
+                            target_duration=project.target_duration,
+                            brand_kit_id=project.brand_kit_id,
+                            content_style=getattr(project, "content_style", "auto"),
+                            art_style=getattr(project, "art_style", "auto"),
+                        )
+
+                        script = await script_generator.generate_script(script_req)
+                        await script_generator.save_script_to_project(session, project_id, script)
+
+                    await self.log_job_event(
+                        job_id=job_id,
+                        stage="script_generation",
+                        message=f"Đã hoàn thành kịch bản: '{script.title}' gồm {len(script.scenes)} phân cảnh.",
+                        progress=25.0,
+                        extra_data={
+                            "action": "script_ready",
+                            "title": script.title,
+                            "hook": script.hook,
+                            "cta": script.call_to_action,
+                            "total_scenes": len(script.scenes),
+                            "scenes_summary": [
+                                {"index": i, "narration": getattr(s, "narration", getattr(s, "narration_text", "")), "keywords": getattr(s, "visual_keywords", "")}
+                                for i, s in enumerate(script.scenes)
+                            ],
+                        },
+                    )
 
             if job_type == "script_only":
                 await self._complete_job(job_id, project_id, None)
@@ -185,7 +210,7 @@ class PipelineRunner:
                 await self.log_job_event(
                     job_id=job_id,
                     stage="image_generation",
-                    message="Bắt đầu tìm kiếm video và hình ảnh thực tế từ internet theo từng phân cảnh...",
+                    message="Bắt đầu chuẩn bị hình ảnh/video cho từng phân cảnh...",
                     progress=30.0,
                     extra_data={"action": "start_visual_sourcing"},
                 )
@@ -200,6 +225,33 @@ class PipelineRunner:
                     engine_name = "Pexels 4K Pro Library" if has_pexels else "Flux.1 & Turbo AI Studio 8K"
 
                     for idx, sc in enumerate(scenes):
+                        # If user provided real product image/video, use it directly!
+                        if sc.image_path and Path(sc.image_path).exists():
+                            asset_path = Path(sc.image_path)
+                            is_vid = asset_path.suffix.lower() in [".webm", ".mp4", ".ogv", ".mov"]
+                            asset_type = "video sản phẩm thực tế" if is_vid else "ảnh sản phẩm thực tế"
+                            rel_media_url = f"/static/uploads/{asset_path.name}" if "uploads" in str(asset_path) else f"/static/outputs/{project_id}/scenes/{asset_path.name}"
+                            pct = 30.0 + (idx + 1) / len(scenes) * 20.0
+
+                            await self.log_job_event(
+                                job_id=job_id,
+                                stage="image_generation",
+                                message=f"Cảnh {idx+1}/{len(scenes)}: Áp dụng {asset_type} bạn đã tải lên ({asset_path.name}).",
+                                progress=round(pct, 1),
+                                extra_data={
+                                    "scene_index": idx,
+                                    "total_scenes": len(scenes),
+                                    "narration": sc.narration_text,
+                                    "visual_prompt": sc.visual_prompt,
+                                    "visual_keywords": getattr(sc, "visual_keywords", ""),
+                                    "media_url": rel_media_url,
+                                    "media_type": "video" if is_vid else "image",
+                                    "action": "media_ready",
+                                    "status": "ready",
+                                },
+                            )
+                            continue
+
                         # Broadcast searching event with prompt & keywords
                         await self.log_job_event(
                             job_id=job_id,
@@ -422,12 +474,19 @@ class PipelineRunner:
 
                 # Generate full ASS subtitles with Intro Hook banner & Outro CTA badge
                 ass_sub_path = project_dir / "subtitles.ass"
+                is_affiliate = (
+                    getattr(proj, "content_style", "") in ["product_review", "affiliate"]
+                    or any(k in (proj.topic or "").lower() for k in ["review", "sản phẩm", "quần áo", "áo", "phụ kiện", "giỏ hàng", "shopee", "tiktok", "deal"])
+                    or job_type == "product_review"
+                )
+                default_cta = "BẤM GIỎ HÀNG GÓC TRÁI NHẬN ƯU ĐÃI NGAY!" if is_affiliate else "Bình luận & Follow kênh ngay!"
                 ffmpeg_editor.generate_ass_subtitle_file(
                     scene_word_cues=all_word_cues,
                     output_ass_path=ass_sub_path,
                     title=proj.title,
-                    call_to_action="Bình luận & Follow kênh ngay!",
+                    call_to_action=default_cta,
                     total_duration=current_time_offset,
+                    is_affiliate=is_affiliate,
                 )
 
                 # Dynamically match BGM based on topic/title sentiment

@@ -1,5 +1,6 @@
 import asyncio
-from typing import List
+import logging
+from typing import List, Dict, Any
 from fastapi import (
     APIRouter,
     BackgroundTasks,
@@ -21,9 +22,13 @@ from app.models.schemas import (
     VideoScriptSchema,
     PipelineJobResponse,
     PipelineRunRequest,
+    ProductReviewRequest,
 )
 from app.orchestrator.script_generator import script_generator
+from app.orchestrator.affiliate_script_generator import affiliate_script_generator
 from app.orchestrator.pipeline_runner import pipeline_runner
+
+logger = logging.getLogger("routes_pipeline")
 
 router = APIRouter(prefix="/pipeline", tags=["Pipeline & Orchestrator"])
 
@@ -53,6 +58,78 @@ async def generate_script(
             raise HTTPException(status_code=404, detail=str(ve))
 
     return script
+
+
+@router.post("/generate-product-review")
+async def generate_product_review(
+    payload: ProductReviewRequest,
+    background_tasks: BackgroundTasks,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    End-to-end endpoint for TikTok Shop & Affiliate Product Review videos:
+    1. Creates project with product details and target audience
+    2. Uses Affiliate Copywriter AI to generate a high-converting KOC script
+    3. Maps user-uploaded product images/clips 1:1 to the scenes
+    4. Triggers background rendering pipeline with Ken Burns motion & TikTok Shop Cart badges
+    """
+    try:
+        # 1. Create project
+        project = Project(
+            title=f"Review {payload.product_name}",
+            topic=f"Review {payload.product_name}: {payload.key_features}",
+            target_duration=payload.target_duration,
+            aspect_ratio="9:16",
+            language=payload.language,
+            content_style="product_review",
+            art_style="auto",
+            status="product_review",
+        )
+        db.add(project)
+        await db.commit()
+        await db.refresh(project)
+
+        # 2. Generate affiliate script
+        script = await affiliate_script_generator.generate_review_script(payload)
+
+        # 3. Save scenes with mapped images
+        await affiliate_script_generator.save_affiliate_script_to_project(
+            db, project.id, script, payload.media_items
+        )
+
+        # 4. Create and launch pipeline job
+        job = PipelineJob(
+            project_id=project.id,
+            job_type="full_pipeline",
+            status="queued",
+            current_stage="queued",
+            progress=0.0,
+        )
+        db.add(job)
+        await db.commit()
+        await db.refresh(job)
+
+        background_tasks.add_task(
+            pipeline_runner.run_pipeline_task,
+            job_id=job.id,
+            job_type="full_pipeline",
+        )
+
+        return {
+            "success": True,
+            "project_id": project.id,
+            "job_id": job.id,
+            "title": script.title,
+            "hook": script.hook,
+            "call_to_action": script.call_to_action,
+            "scenes_count": len(script.scenes),
+        }
+    except Exception as e:
+        logger.error(f"Generate product review failed: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Không thể tạo video review sản phẩm: {str(e)}",
+        )
 
 
 @router.post("/{project_id}/run", response_model=PipelineJobResponse)

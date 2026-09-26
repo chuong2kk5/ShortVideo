@@ -32,6 +32,7 @@ class Settings(BaseSettings):
     OUTPUTS_DIR: str = "./data/outputs"
     TEMP_CACHE_DIR: str = "./data/temp"
     BRAND_KITS_DIR: str = "./data/brand_kits"
+    UPLOADS_DIR: str = "./data/uploads"
 
     # Hardware Memory Guard Thresholds
     MAX_RAM_PERCENT_THRESHOLD: float = 85.0
@@ -100,6 +101,11 @@ class Settings(BaseSettings):
 
     def get_brand_kits_path(self) -> Path:
         p = self.resolve_path(self.BRAND_KITS_DIR)
+        p.mkdir(parents=True, exist_ok=True)
+        return p
+
+    def get_uploads_path(self) -> Path:
+        p = self.resolve_path(self.UPLOADS_DIR)
         p.mkdir(parents=True, exist_ok=True)
         return p
 

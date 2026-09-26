@@ -67,6 +67,7 @@ class FFmpegEditor:
         primary_color: str = "&H00FFFFFF",  # Crisp White base
         highlight_color: str = "&H0000FFFF",  # Neon Yellow active word
         outline_color: str = "&H00000000",  # Black border
+        is_affiliate: bool = False,
     ) -> Path:
         """
         Creates ASS subtitle file styled for vertical Shorts/TikTok:
@@ -75,6 +76,7 @@ class FFmpegEditor:
         - Centered in the bottom third (Alignment=2, MarginV=340).
         - Intro Hook Title Banner overlay during opening 4s (Alignment=8, Top).
         - Outro Call-To-Action card overlay during final 3.5s (Alignment=2, Bottom).
+        - Optional TikTok Shop Cart sticker badge for affiliate videos.
         """
         output_ass_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -89,6 +91,7 @@ Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour,
 Style: ShortsStyle,{font_name},{font_size},{primary_color},&H00FFFFFF,{outline_color},&H80000000,-1,0,0,0,100,100,0,0,1,6,2,2,60,60,340,1
 Style: IntroHeaderStyle,Impact,48,&H0000FFFF,&H00FFFFFF,{outline_color},&H90000000,-1,0,0,0,100,100,0,0,1,6,3,8,80,80,180,1
 Style: OutroBadgeStyle,Impact,46,&H0000FFFF,&H00FFFFFF,{outline_color},&H90000000,-1,0,0,0,100,100,0,0,1,6,3,2,80,80,490,1
+Style: TikTokCartBadge,Impact,40,&H0000E5FF,&H00FFFFFF,{outline_color},&HA0000000,-1,0,0,0,100,100,0,0,1,5,2,1,60,60,240,1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
@@ -103,8 +106,9 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
             intro_dur = min(4.2, total_duration - 0.5) if total_duration > 5.0 else 4.0
             intro_start_ts = self.format_ass_timestamp(0.0)
             intro_end_ts = self.format_ass_timestamp(intro_dur)
+            icon = "🛒" if is_affiliate else "🔥"
             events.append(
-                f"Dialogue: 1,{intro_start_ts},{intro_end_ts},IntroHeaderStyle,,0,0,0,,{{\\fad(250,300)}}🔥 {clean_title.upper()} 🔥"
+                f"Dialogue: 1,{intro_start_ts},{intro_end_ts},IntroHeaderStyle,,0,0,0,,{{\\fad(250,300)}}{icon} {clean_title.upper()} {icon}"
             )
 
         # 2. Outro Call-To-Action Card (Final 3.5 seconds)
@@ -112,11 +116,21 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
             outro_start = max(0.0, total_duration - 3.6)
             outro_start_ts = self.format_ass_timestamp(outro_start)
             outro_end_ts = self.format_ass_timestamp(total_duration)
-            cta_text = (call_to_action or "BÌNH LUẬN & FOLLOW KÊNH NGAY!").strip().upper()
+            default_cta = "BẤM GIỎ HÀNG GÓC TRÁI NHẬN ƯU ĐÃI NGAY!" if is_affiliate else "BÌNH LUẬN & FOLLOW KÊNH NGAY!"
+            cta_text = (call_to_action or default_cta).strip().upper()
             if len(cta_text) > 65:
                 cta_text = cta_text[:62] + "..."
+            cta_icon = "🛒" if is_affiliate else "👉"
             events.append(
-                f"Dialogue: 1,{outro_start_ts},{outro_end_ts},OutroBadgeStyle,,0,0,0,,{{\\fad(300,400)}}👉 {cta_text} 🚀"
+                f"Dialogue: 1,{outro_start_ts},{outro_end_ts},OutroBadgeStyle,,0,0,0,,{{\\fad(300,400)}}{cta_icon} {cta_text} 🚀"
+            )
+
+        # 2.1 Persistent TikTok Shop Cart Badge for affiliate videos
+        if is_affiliate and total_duration > 4.0:
+            badge_start_ts = self.format_ass_timestamp(2.5)
+            badge_end_ts = self.format_ass_timestamp(max(3.0, total_duration - 1.0))
+            events.append(
+                f"Dialogue: 2,{badge_start_ts},{badge_end_ts},TikTokCartBadge,,0,0,0,,{{\\fad(400,400)}}🛒 GIỎ HÀNG CHÍNH HÃNG ⚡ GIẢM ĐẾN 50%"
             )
 
         # 3. Dynamic Word-by-Word Karaoke Subtitles
@@ -271,6 +285,10 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                 zoom_expr = f"z='1.16':x='(1.0 - (1-exp(-3.0*{p}))*0.8 - {p}*0.2)*(iw-iw/zoom)':y='ih/2-(ih/zoom/2)'"
             elif motion_effect == "pan_right":
                 zoom_expr = f"z='1.16':x='((1-exp(-3.0*{p}))*0.8 + {p}*0.2)*(iw-iw/zoom)':y='ih/2-(ih/zoom/2)'"
+            elif motion_effect == "macro_zoom":
+                zoom_expr = f"z='min(1.18 + (1-exp(-4.0*{p}))*0.35 + {p}*0.12, 1.65)':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)'"
+            elif motion_effect == "showcase_pan":
+                zoom_expr = f"z='1.22':x='iw/2-(iw/zoom/2)':y='(0.08 + (1-exp(-3.2*{p}))*0.8 + {p}*0.12)*(ih-ih/zoom)'"
             elif motion_effect in ["drift", "ken_burns"]:
                 zoom_expr = f"z='1.04 + {p}*0.14':x='({p})*(iw-iw/zoom)':y='(1.0 - {p})*(ih-ih/zoom)'"
             elif motion_effect == "shake":

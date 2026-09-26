@@ -314,4 +314,40 @@ export const DEFAULT_VOICE_CATALOG: VoiceProfile[] = [
   },
 ];
 
+export interface ProductMediaItem {
+  url: string;
+  local_path: string;
+  filename: string;
+  media_type: 'image' | 'video';
+  caption?: string;
+  size_bytes?: number;
+}
+
+export interface ProductReviewRequest {
+  product_name: string;
+  category: string;
+  key_features: string;
+  deal_info?: string;
+  target_audience?: string;
+  template_type: string;
+  reference_video_url?: string;
+  reference_video_path?: string;
+  media_items: ProductMediaItem[];
+  voice?: string;
+  target_duration?: number;
+  language?: string;
+}
+
+export interface ReferenceVideoAnalysis {
+  filename: string;
+  url: string;
+  local_path: string;
+  duration: number;
+  width: number;
+  height: number;
+  aspect_ratio: string;
+  detected_scenes_count: number;
+  avg_scene_duration: number;
+}
+
 

@@ -26,6 +26,7 @@ async def lifespan(app: FastAPI):
     settings.get_outputs_path()
     settings.get_temp_path()
     settings.get_brand_kits_path()
+    settings.get_uploads_path()
 
     # 2. Initialize SQLite tables
     logger.info("Initializing SQLite database...")
@@ -64,9 +65,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Static file serving for outputs
+# Static file serving for outputs and uploads
 outputs_dir = settings.get_outputs_path()
 app.mount("/static/outputs", StaticFiles(directory=str(outputs_dir)), name="outputs")
+
+uploads_dir = settings.get_uploads_path()
+app.mount("/static/uploads", StaticFiles(directory=str(uploads_dir)), name="uploads")
 
 # Mount API routes
 app.include_router(api_router)

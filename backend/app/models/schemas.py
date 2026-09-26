@@ -12,6 +12,8 @@ MotionEffectType = Literal[
     "zoom_out",
     "pan_left",
     "pan_right",
+    "macro_zoom",
+    "showcase_pan",
     "ken_burns",
     "shake",
     "static",
@@ -74,6 +76,29 @@ class ScriptGenerateRequest(BaseModel):
     custom_instructions: Optional[str] = Field(
         default=None, description="Additional custom instructions or constraints for the script"
     )
+
+
+class ProductMediaItem(BaseModel):
+    url: str
+    local_path: str
+    filename: str
+    media_type: Literal["image", "video"] = "image"
+    caption: Optional[str] = None
+
+
+class ProductReviewRequest(BaseModel):
+    product_name: str = Field(description="Tên sản phẩm cần review (ví dụ: Áo Polo Nam Cotton Cổ Dệt)")
+    category: str = Field(default="fashion", description="fashion, accessories, tech_gadget, beauty, home, general")
+    key_features: str = Field(description="Điểm nổi bật, chất liệu, tính năng (ví dụ: vải cá sấu gai co giãn 4 chiều, không xù)")
+    deal_info: Optional[str] = Field(default="Đang có deal sốc giảm 50% và freeship", description="Thông tin giá hoặc khuyến mãi")
+    target_audience: Optional[str] = Field(default=None, description="Đối tượng khách hàng mục tiêu")
+    template_type: str = Field(default="fashion_ootd", description="fashion_ootd, accessories_unboxing, gadget_practical, beauty_review, reference_match")
+    reference_video_url: Optional[str] = None
+    reference_video_path: Optional[str] = None
+    media_items: List[ProductMediaItem] = Field(default_factory=list, description="Danh sách ảnh/clip sản phẩm thật đã upload")
+    voice: Optional[str] = Field(default="vi-VN-HoaiMyNeural", description="Giọng đọc thuyết minh Edge-TTS")
+    target_duration: int = Field(default=30, ge=15, le=90)
+    language: str = Field(default="vi")
 
 
 # ==============================================================================

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Header } from './components/Header';
 import { CreateVideoModal } from './components/CreateVideoModal';
+import { ProductReviewModal } from './components/ProductReviewModal';
 import { AISettingsModal } from './components/AISettingsModal';
 import { PipelineTracker } from './components/PipelineTracker';
 import { SceneEditor } from './components/SceneEditor';
@@ -18,6 +19,7 @@ export const App: React.FC = () => {
   const [channels, setChannels] = useState<YouTubeChannel[]>([]);
   const [brandKits, setBrandKits] = useState<BrandKit[]>([]);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [isProductReviewModalOpen, setIsProductReviewModalOpen] = useState(false);
   const [isAISettingsOpen, setIsAISettingsOpen] = useState(false);
 
   const wsRef = useRef<WebSocket | null>(null);
@@ -198,6 +200,36 @@ export const App: React.FC = () => {
     }
   };
 
+  // Handle product review created
+  const handleProductReviewCreated = async (projectId: string, jobId: string) => {
+    // 1. Fetch updated project
+    try {
+      const res = await fetch(`/api/projects/${projectId}`);
+      if (res.ok) {
+        const proj = await res.json();
+        setCurrentProject(proj);
+      }
+    } catch (e) {
+      console.error('Failed to fetch review project', e);
+    }
+
+    // 2. Set current job to trigger real-time WebSocket tracker
+    setCurrentJob({
+      id: jobId,
+      project_id: projectId,
+      job_type: 'full_pipeline',
+      status: 'running',
+      current_stage: 'queued',
+      progress: 0.0,
+      logs: [],
+      created_at: new Date().toISOString(),
+    });
+
+    // 3. Switch to studio & refresh projects list
+    setActiveTab('studio');
+    fetchProjects();
+  };
+
   // Delete project
   const handleDeleteProject = async (projectId: string) => {
     await fetch(`/api/projects/${projectId}`, { method: 'DELETE' });
@@ -214,6 +246,7 @@ export const App: React.FC = () => {
         activeTab={activeTab}
         setActiveTab={setActiveTab}
         onOpenCreateModal={() => setIsCreateModalOpen(true)}
+        onOpenProductReviewModal={() => setIsProductReviewModalOpen(true)}
         onOpenAISettings={() => setIsAISettingsOpen(true)}
         onRefreshHealth={fetchHealth}
       />
@@ -264,6 +297,12 @@ export const App: React.FC = () => {
         onClose={() => setIsCreateModalOpen(false)}
         brandKits={brandKits}
         onStartGeneration={handleStartGeneration}
+      />
+
+      <ProductReviewModal
+        isOpen={isProductReviewModalOpen}
+        onClose={() => setIsProductReviewModalOpen(false)}
+        onReviewCreated={handleProductReviewCreated}
       />
 
       <AISettingsModal

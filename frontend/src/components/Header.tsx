@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Sparkles, Cpu, HardDrive, Trash2, Plus, RefreshCw } from 'lucide-react';
+import { Sparkles, Cpu, HardDrive, Trash2, Plus, RefreshCw, ShoppingBag } from 'lucide-react';
 import { SystemHealth } from '../types';
 
 interface HeaderProps {
@@ -7,6 +7,7 @@ interface HeaderProps {
   activeTab: 'studio' | 'library' | 'youtube';
   setActiveTab: (tab: 'studio' | 'library' | 'youtube') => void;
   onOpenCreateModal: () => void;
+  onOpenProductReviewModal: () => void;
   onOpenAISettings: () => void;
   onRefreshHealth: () => void;
 }
@@ -16,6 +17,7 @@ export const Header: React.FC<HeaderProps> = ({
   activeTab,
   setActiveTab,
   onOpenCreateModal,
+  onOpenProductReviewModal,
   onOpenAISettings,
   onRefreshHealth,
 }) => {
@@ -133,6 +135,17 @@ export const Header: React.FC<HeaderProps> = ({
           >
             <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
             <span className="hidden sm:inline">Cấu Hình AI</span>
+          </button>
+
+          {/* Product Review Button */}
+          <button
+            onClick={onOpenProductReviewModal}
+            className="flex items-center gap-1.5 bg-gradient-to-r from-rose-500 via-orange-500 to-amber-500 hover:from-rose-600 hover:to-amber-600 text-slate-950 font-extrabold px-3.5 py-2 rounded-xl text-xs transition-all shadow-lg shadow-rose-500/25 active:scale-95"
+            title="Ghép video review sản phẩm với ảnh mẫu thật"
+          >
+            <ShoppingBag className="w-4 h-4 stroke-[2.5]" />
+            <span className="hidden sm:inline">Review Sản Phẩm</span>
+            <span className="sm:hidden">Review</span>
           </button>
 
           {/* Create Video Button */}
