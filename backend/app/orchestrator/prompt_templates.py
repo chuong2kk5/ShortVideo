@@ -92,8 +92,9 @@ NEVER substitute the topic with pyramids, ancient egypt, or any unrelated subjec
 1. KHÔNG VIẾT KIỂU TẢ VĂN / ĐỊNH NGHĨA KHÔ KHAN:
    - TUYỆT ĐỐI KHÔNG dùng các câu thuyết minh sáo rỗng, nhận định trừu tượng như: "Khoa học hiện đại vẫn chưa thể giải thích nổi...", "Các chuyên gia đã vô cùng kinh ngạc...", "Nơi đây có khí hậu khắc nghiệt và nhiều điều bí ẩn...".
    - Tuyệt đối TRÁNH các câu văn mẫu sáo rỗng bị lặp đi lặp lại như: "99% mọi người đều hiểu sai về...", "Bí mật đáng sợ nhất mà họ không muốn bạn biết...", "Điều này nghe có vẻ điên rồ...".
+   - BẮT BUỘC kể như một đoạn phim ngắn kịch tính (Micro-Movie): Có nhân vật/nhân chứng, có biến cố cụ thể diễn ra theo thời gian thực, có cao trào và nút thắt.
 
-2. KỂ CHUYỆN CÓ CỐT TRUYỆN, NHÂN VẬT & DIỄN BIẾN LE TĂNG (STORY ARC):
+2. KỂ CHUYỆN CÓ CỐT TRUYỆN, NHÂN VẬT & DIỄN BIẾN LEO TĂNG (STORY ARC):
    - Mở màn bằng một biến cố giật gân, nhân vật thực tế, hoặc tình huống đưa người xem trực tiếp vào vai người trải nghiệm.
    - Từng phân cảnh là một bước phát triển kịch tính tiếp nối của câu chuyện (hành động nhân vật, khám phá nguy hiểm, tiếng động kỳ lạ, bước ngoặt sốc).
    - Tận dụng tối đa chi tiết giác quan (tiếng la bàn quay cuồng, bóng đen vụt qua cây cổ thụ, tiếng thì thầm trong sương đêm, vết rách trên lều...).
@@ -106,11 +107,13 @@ NEVER substitute the topic with pyramids, ancient egypt, or any unrelated subjec
    - Sử dụng ngôn từ nói chuyện đời thường, truyền cảm, có hồn, giàu hình ảnh.
    - Ngắt câu nhịp nhàng (5 đến 8 từ một vế câu). Sử dụng dấu phẩy (,), dấu chấm (.), dấu ba chấm (...) khéo léo để giọng đọc AI ngắt nghỉ tự nhiên, có điểm rơi nhịp điệu (cadence).
 
-### VISUAL PROMPTS & KEYWORDS (100% TIED TO STORY ACTION):
-- Visual Prompts (visual_prompt): MUST BE 100% IN ENGLISH, highly descriptive, cinematic lighting, 9:16 vertical composition, 8k resolution, tailored to the requested Art Style.
-  - MUST depict the EXACT PHYSICAL STORY ACTION occurring in THAT scene (e.g. "British explorer in 1920s gear holding lantern trekking through dark foggy rainforest vines", "Close up of torn expedition tent flapping violently in stormy jungle wind").
-  - NEVER use generic abstract props like "magnifying glass on desk", "paper map on table", "scientist office" unless the topic is literally an office desk! Show the actual jungle, space, animals, ocean, or characters!
-- Visual Keywords (visual_keywords): MUST BE 2 TO 4 CONCRETE PHYSICAL ENGLISH NOUNS (e.g. "rainforest explorer lantern", "abandoned campsite rain", "dense jungle mist night", "ancient stone ruins").
+### VISUAL PROMPTS & KEYWORDS (KHÓA CHẶT TÍNH ĐỒNG BỘ & ÁNH XẠ 1:1 VỚI LỜI THOẠI):
+- BẮT BUỘC ĐỒNG NHẤT KHÔNG GIAN & ÁNH SÁNG (VISUAL CONTINUITY ANCHOR):
+  - Toàn bộ các cảnh trong cùng một video PHẢI DUY TRÌ CHUNG một môi trường ánh sáng, thời gian và không gian (ví dụ: nếu câu chuyện xảy ra ban đêm trong bão, mọi cảnh ngoài trời PHẢI ghi rõ "at night, dramatic stormy dark atmosphere, volumetric moonlight", TUYỆT ĐỐI KHÔNG để cảnh trước là đêm mà cảnh sau lại là ban ngày nắng vàng).
+- ÁNH XẠ 1:1 TRỰC QUAN VỚI LỜI THOẠI (STRICT 1:1 STORY ACTION MATCHING):
+  - Lời thoại nói về cái gì thì `visual_prompt` PHẢI vẽ đúng chủ thể và hành động đó (ví dụ: lời thoại "đốm sáng lạ quét qua vách núi để lại khói đen" -> visual_prompt BẮT BUỘC là "Glowing eerie extraterrestrial light sweeping across jagged mountain ridge leaving trail of black smoke at night, volumetric lighting, 8k").
+  - CẤM vẽ các đạo cụ trừu tượng: NEVER use generic abstract props like "magnifying glass on desk", "paper map on table", "scientist office" unless the topic is literally an office desk! Show the actual jungle, space, animals, ocean, or characters!
+- Visual Keywords (visual_keywords): MUST BE 2 TO 4 CONCRETE PHYSICAL ENGLISH NOUNS (e.g. "mountain peak dark smoke", "radar screen glow tent", "bioluminescent deep ocean submarine").
   NEVER use abstract words like "mystery", "history", "amazing". Concrete physical subjects allow the AI engines to render breathtaking footage!
 
 ### OUTPUT FORMAT:
@@ -174,7 +177,7 @@ def build_user_prompt(
         scene_templates.append(f"""    {{
       "scene_index": {i},
       "narration": "{narration_placeholder}",
-      "visual_prompt": "Vertical 9:16 cinematic shot showing concrete story action of scene {i+1}, {art_style_prompt_suffix}",
+      "visual_prompt": "Vertical 9:16 cinematic shot showing concrete story action of scene {i+1}, matching this exact scene narration, {art_style_prompt_suffix}",
       "visual_keywords": "<2-4 concrete English physical nouns matching this exact scene's action>",
       "motion_effect": "{m}",
       "sound_effect_cue": "{s}",
@@ -191,6 +194,10 @@ Tất cả tiêu đề, câu hook, câu chuyện kịch bản và hình ảnh PH
 - KỂ CHUYỆN NHẬP VAI, KHÔNG TẢ VĂN: Xây dựng câu chuyện có diễn biến liên tục, từng cảnh là một bước phát triển hấp dẫn, lôi cuốn người nghe theo dõi đến giây cuối cùng.
 - CẤM LẶP LẠI TÊN CHỦ ĐỀ: TUYỆT ĐỐI KHÔNG lặp lại cụm từ "{topic}" trong lời thoại các cảnh thân bài! Dùng ngôn ngữ tự nhiên: "nơi này", "họ", "đoàn người", "chuyến đi định mệnh"...
 - CẤM CÂU THUYẾT MINH CHUNG CHUNG: Cấm các câu sáo rỗng như "khoa học chưa giải thích nổi", "các chuyên gia kinh ngạc". Mọi cảnh phải có chi tiết hành động hoặc sự kiện cụ thể!
+
+### ĐỒNG BỘ ÁNH SÁNG & KHÔNG GIAN TOÀN DIỆN (VISUAL CONTINUITY ANCHOR):
+- Tất cả các `visual_prompt` trong video PHẢI DUY TRÌ ĐỒNG NHẤT BỐI CẢNH (ví dụ: nếu câu chuyện xảy ra ban đêm thì MỌI CẢNH ngoài trời đều phải ghi rõ 'at night, dark cinematic lighting', CẤM cảnh trước là đêm u ám mà cảnh sau lại nhảy sang ban ngày trời xanh mây trắng).
+- Mỗi cảnh `visual_prompt` PHẢI là hình ảnh trực quan thể hiện ĐÚNG 100% chi tiết trong `narration` của cảnh đó.
 
 ### ĐỊNH HƯỚNG NỘI DUNG & PHONG CÁCH KỊCH BẢN:
 {content_directive}

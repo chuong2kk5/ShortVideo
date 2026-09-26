@@ -160,124 +160,55 @@ class ComfyUIProvider:
         art_style: Optional[str] = "auto",
     ) -> Optional[Path]:
         """
-        Searches for and downloads authentic moving video footage (.webm, .mp4)
-        strictly matching the video topic from Pexels (if API key available) and Wikimedia Commons.
+        Searches for and downloads authentic moving video footage (.mp4)
+        strictly matching the video topic from Pexels (if API key available).
         Skips previously used clips to prevent repetition across scenes.
+        NEVER falls back to Wikimedia Commons or random web scrapers.
         """
         output_path.parent.mkdir(parents=True, exist_ok=True)
+        pexels_key = getattr(settings, "PEXELS_API_KEY", "").strip()
+        if not pexels_key:
+            return None
+
         search_candidates = self._extract_search_queries(keywords, prompt, narration, topic=topic)
-        headers = {"User-Agent": self._ua}
-
-        # 1. Pexels API (if configured)
-        if getattr(settings, "PEXELS_API_KEY", ""):
-            try:
-                for query in search_candidates[:3]:
-                    pexels_url = "https://api.pexels.com/videos/search"
-                    page_num = (scene_index // 3) + 1
-                    params = {"query": query, "orientation": "portrait", "per_page": 10, "page": page_num}
-                    async with httpx.AsyncClient(timeout=20.0, follow_redirects=True) as client:
-                        res = await client.get(
-                            pexels_url,
-                            params=params,
-                            headers={"Authorization": settings.PEXELS_API_KEY},
-                        )
-                        if res.status_code == 200:
-                            videos = res.json().get("videos", [])
-                            for v in videos:
-                                vid_id = str(v.get("id", ""))
-                                if vid_id and vid_id in self._used_asset_signatures:
-                                    continue
-                                video_files = v.get("video_files", [])
-                                video_files.sort(key=lambda f: abs(f.get("width", 0) - 1080))
-                                for vf in video_files:
-                                    link = vf.get("link")
-                                    if not link or link in self._used_asset_signatures:
-                                        continue
-                                    target_vid = output_path.with_suffix(".mp4")
-                                    dl = await client.get(link)
-                                    if dl.status_code == 200 and len(dl.content) > 100_000:
-                                        target_vid.write_bytes(dl.content)
-                                        if vid_id:
-                                            self._used_asset_signatures.add(vid_id)
-                                        self._used_asset_signatures.add(link)
-                                        logger.info(f"Pexels stock video downloaded (id={vid_id}): {target_vid}")
-                                        return target_vid
-            except Exception as e:
-                logger.warning(f"Pexels video search error: {e}")
-
-        # 2. Wikimedia Commons Video Search (100% free, zero key required)
-        async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
-            for query in search_candidates:
-                search_term = f"{query} filetype:video"
-                logger.info(f"Searching Wikimedia Commons for video: '{search_term}'...")
-                try:
+        try:
+            for query in search_candidates[:3]:
+                pexels_url = "https://api.pexels.com/videos/search"
+                page_num = (scene_index // 3) + 1
+                params = {"query": query, "orientation": "portrait", "per_page": 10, "page": page_num}
+                async with httpx.AsyncClient(timeout=20.0, follow_redirects=True) as client:
                     res = await client.get(
-                        "https://commons.wikimedia.org/w/api.php",
-                        params={
-                            "action": "query",
-                            "generator": "search",
-                            "gsrsearch": search_term,
-                            "gsrnamespace": 6,
-                            "prop": "imageinfo",
-                            "iiprop": "url|mime|size|dimensions",
-                            "format": "json",
-                            "gsrlimit": 8,
-                        },
-                        headers=headers,
+                        pexels_url,
+                        params=params,
+                        headers={"Authorization": pexels_key},
                     )
-                    if res.status_code != 200:
-                        continue
-
-                    pages = res.json().get("query", {}).get("pages", {})
-                    candidates = []
-                    for page_id, page_data in pages.items():
-                        info_list = page_data.get("imageinfo", [])
-                        if not info_list:
-                            continue
-                        info = info_list[0]
-                        vurl = info.get("url", "")
-                        vmime = info.get("mime", "")
-                        vsize = info.get("size", 0)
-                        vwidth = info.get("width", 0)
-                        vheight = info.get("height", 0)
-
-                        if vurl in self._used_asset_signatures:
-                            continue
-
-                        ext = Path(vurl.split("?")[0]).suffix.lower()
-                        if ext in [".webm", ".mp4", ".ogv"] or vmime.startswith("video/"):
-                            is_portrait = 1 if (vheight > vwidth) else 0
-                            is_hd = 1 if (vwidth >= 1280 or vheight >= 720 or (vwidth >= 720 and vheight >= 1280)) else 0
-                            # STRICT QUALITY FILTER: Only accept genuine HD vertical/portrait videos
-                            if is_portrait and is_hd and 500_000 <= vsize <= 50_000_000:
-                                candidates.append((vurl, ext or ".webm", vsize, is_portrait, is_hd, vwidth, vheight))
-
-                    # Prioritize native vertical first, then HD quality, then largest file size
-                    candidates.sort(key=lambda c: (c[3], c[4], c[2]), reverse=True)
-
-                    # Download candidate video
-                    for vurl, ext, vsize, is_port, is_hd, vw, vh in candidates:
-                        if vurl in self._used_asset_signatures:
-                            continue
-                        try:
-                            target_file = output_path.with_suffix(ext if ext in [".webm", ".mp4", ".ogv"] else ".webm")
-                            orient_tag = "Portrait " if is_port else ""
-                            hd_tag = f"{orient_tag}HD {vw}x{vh}" if is_hd else f"{orient_tag}{vw}x{vh}"
-                            logger.info(f"Downloading video clip [{hd_tag}] ({vsize / 1024 / 1024:.1f} MB) from {vurl[:80]}...")
-                            dl_res = await client.get(vurl, headers=headers)
-                            if dl_res.status_code == 200 and len(dl_res.content) > 100_000:
-                                target_file.write_bytes(dl_res.content)
-                                self._used_asset_signatures.add(vurl)
-                                logger.info(f"Stock video downloaded successfully: {target_file} ({len(dl_res.content)} bytes)")
-                                return target_file
-                        except Exception as dl_err:
-                            logger.debug(f"Failed downloading {vurl}: {dl_err}")
-                except Exception as q_err:
-                    logger.debug(f"Wikimedia video query '{query}' failed: {q_err}")
+                    if res.status_code == 200:
+                        videos = res.json().get("videos", [])
+                        for v in videos:
+                            vid_id = str(v.get("id", ""))
+                            if vid_id and vid_id in self._used_asset_signatures:
+                                continue
+                            video_files = v.get("video_files", [])
+                            video_files.sort(key=lambda f: abs(f.get("width", 0) - 1080))
+                            for vf in video_files:
+                                link = vf.get("link")
+                                if not link or link in self._used_asset_signatures:
+                                    continue
+                                target_vid = output_path.with_suffix(".mp4")
+                                dl = await client.get(link)
+                                if dl.status_code == 200 and len(dl.content) > 100_000:
+                                    target_vid.write_bytes(dl.content)
+                                    if vid_id:
+                                        self._used_asset_signatures.add(vid_id)
+                                    self._used_asset_signatures.add(link)
+                                    logger.info(f"Pexels stock video downloaded (id={vid_id}): {target_vid}")
+                                    return target_vid
+        except Exception as e:
+            logger.warning(f"Pexels video search error: {e}")
 
         return None
 
-    async def _generate_flux_pollinations(
+    async def _generate_ai_artwork(
         self,
         prompt: str,
         output_path: Path,
@@ -288,10 +219,10 @@ class ComfyUIProvider:
         art_style: Optional[str] = "auto",
     ) -> Optional[Path]:
         """
-        Generates hyper-realistic, photorealistic or stylized 9:16 vertical artwork using Flux.1 Schnell via Pollinations.ai.
-        100% free, zero API key required, fast (2-4 seconds).
+        Generates hyper-realistic, photorealistic or stylized 9:16 vertical artwork
+        using multi-tier AI diffusion models (Flux.1 Schnell, SDXL Turbo, Sana).
+        100% free, zero API key required, with automatic retry and backoff.
         Anchors generation strictly to clean English story prompts and art style with unique per-scene seeds.
-        Includes fast fallback to model=turbo (SDXL Turbo) if flux server is busy.
         """
         from app.orchestrator.prompt_templates import resolve_art_style, ART_STYLE_DIRECTIVES
 
@@ -302,14 +233,14 @@ class ComfyUIProvider:
             prompt,
             flags=re.IGNORECASE,
         ).strip()
-        # Remove any non-ASCII / Vietnamese characters that confuse Flux CLIP text encoder
+        # Remove any non-ASCII / Vietnamese characters that confuse CLIP text encoder
         clean_p = re.sub(r"[^\x00-\x7F]+", " ", clean_p).strip()
         clean_p = re.sub(r"\s+", " ", clean_p)
 
         resolved_style = resolve_art_style(topic or "", art_style or "auto")
         style_directive = ART_STYLE_DIRECTIVES.get(resolved_style, ART_STYLE_DIRECTIVES["cinematic"])
 
-        # If topic is pure English, we can include it as prefix; otherwise omit non-English topic
+        # If topic is pure English, include as prefix; otherwise omit non-English topic
         topic_clean_en = ""
         if topic and not any(ord(c) > 127 for c in topic):
             topic_clean_en = f"{topic.strip()}, "
@@ -320,32 +251,55 @@ class ComfyUIProvider:
         encoded = urllib.parse.quote(enhanced_prompt)
         seed = (random.randint(100000, 9000000) + (scene_index + 1) * 31337 + abs(hash(prompt)) % 10000) % 10000000
 
-        # Try Primary: Flux.1 Schnell, Fallback: Turbo (SDXL Turbo 1s)
+        # Multi-model tier: Flux.1 Schnell (primary) -> SDXL Turbo (1.2s speed) -> Sana (Diffusion fallback)
         models_to_try = [
-            ("flux", 25.0),
+            ("flux", 20.0),
             ("turbo", 15.0),
+            ("sana", 25.0),
         ]
 
-        for model_name, timeout_sec in models_to_try:
-            url = f"https://image.pollinations.ai/prompt/{encoded}?width=720&height=1280&model={model_name}&nologo=true&seed={seed}"
-            try:
-                logger.info(
-                    f"Calling Tier 1 [{model_name.upper()} AI] for scene {scene_index} (art_style={resolved_style}, seed={seed})..."
-                )
-                async with httpx.AsyncClient(timeout=timeout_sec, follow_redirects=True) as client:
-                    res = await client.get(url)
-                    if res.status_code == 200 and len(res.content) > 15_000:
-                        raw_img = Image.open(io.BytesIO(res.content)).convert("RGB")
-                        processed = self._crop_and_enhance_to_vertical(raw_img, target_w, target_h)
-                        processed.save(output_path, "JPEG", quality=95)
-                        logger.info(
-                            f"Tier 1 [{model_name.upper()} AI - {resolved_style}] generated successfully: {output_path} ({processed.size})"
-                        )
-                        return output_path
-            except Exception as e:
-                logger.warning(f"Tier 1 [{model_name.upper()} AI] attempt failed ({e}), trying next fallback...")
+        browser_headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+            "Accept": "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
+        }
+
+        # Try up to 2 passes with backoff
+        for attempt in range(1, 3):
+            for model_name, timeout_sec in models_to_try:
+                # Use 576x1024 (exact 9:16) for fast generation without GPU overload, then enhance to 1080x1920
+                url = f"https://image.pollinations.ai/prompt/{encoded}?width=576&height=1024&model={model_name}&nologo=true&seed={seed}"
+                try:
+                    logger.info(
+                        f"Calling AI Art Tier [{model_name.upper()}] (attempt {attempt}, scene {scene_index}, seed={seed})..."
+                    )
+                    async with httpx.AsyncClient(timeout=timeout_sec, follow_redirects=True, headers=browser_headers) as client:
+                        res = await client.get(url)
+                        if res.status_code == 200 and len(res.content) > 4000:
+                            # Verify valid image with PIL
+                            raw_img = Image.open(io.BytesIO(res.content)).convert("RGB")
+                            if raw_img.width >= 200 and raw_img.height >= 200:
+                                processed = self._crop_and_enhance_to_vertical(raw_img, target_w, target_h)
+                                processed.save(output_path, "JPEG", quality=95)
+                                logger.info(
+                                    f"AI Art Tier [{model_name.upper()} - {resolved_style}] generated successfully: {output_path} ({processed.size})"
+                                )
+                                return output_path
+                        elif res.status_code == 429:
+                            logger.warning(f"Pollinations {model_name} rate limit (429), pausing 1.5s...")
+                            await asyncio.sleep(1.5)
+                        else:
+                            logger.warning(f"Pollinations {model_name} returned status {res.status_code}, trying next model...")
+                except Exception as e:
+                    logger.warning(f"AI Art [{model_name.upper()}] attempt {attempt} failed ({e}), trying next model...")
+
+            if attempt == 1:
+                # Short backoff before 2nd pass
+                await asyncio.sleep(2.0)
 
         return None
+
+    # Backward compatibility alias
+    _generate_flux_pollinations = _generate_ai_artwork
 
     async def _search_pexels_photo(
         self,
@@ -419,14 +373,11 @@ class ComfyUIProvider:
         art_style: Optional[str] = "auto",
     ) -> Path:
         """
-        Executes tiered visual generation:
+        Executes tiered visual generation with ZERO web scraping:
         0. Pexels Photo API (When PEXELS_API_KEY is configured in .env)
-        1. Flux.1 Photorealistic / Stylized AI (Pollinations.ai - 100% Free, Zero Key, 9:16 Masterpiece)
-        2. Web Photographic Engine (Google / Bing global web index for authentic photos matching topic)
-        3. Semantic Photographic Matcher (Wikimedia Commons 100M+ high-res photos)
-        4. Google Imagen 3 (Gemini API Key)
-        5. Local ComfyUI (if active)
-        6. Atmospheric Procedural Canvas (final offline fallback)
+        1. Local ComfyUI (if SDXL/Flux is running locally on http://127.0.0.1:8188)
+        2. AI Multi-Model Artwork Engine (Flux.1 Schnell / SDXL Turbo / Sana with auto-retry)
+        3. Atmospheric Procedural Canvas (final offline fallback, guaranteed clean cinematic composition)
         """
         output_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -454,10 +405,23 @@ class ComfyUIProvider:
                 logger.warning(f"Tier 0 [Pexels Photo API] failed: {e}")
 
         # ------------------------------------------------------------------
-        # TIER 1: Flux.1 Photorealistic AI (Pollinations.ai - 100% Free, Zero Key)
+        # TIER 1: Local ComfyUI (if running locally)
+        # ------------------------------------------------------------------
+        if await self.is_available():
+            try:
+                logger.info(f"ComfyUI is online at {self.base_url}. Generating via SDXL...")
+                image_path = await self._generate_comfyui(prompt, output_path)
+                if image_path and image_path.exists():
+                    logger.info(f"Tier 1 [Local ComfyUI] generated: {output_path}")
+                    return image_path
+            except Exception as e:
+                logger.warning(f"Tier 1 [Local ComfyUI] failed ({e})")
+
+        # ------------------------------------------------------------------
+        # TIER 2: AI Multi-Model Artwork Engine (Flux.1 / Turbo / Sana)
         # ------------------------------------------------------------------
         try:
-            flux_img = await self._generate_flux_pollinations(
+            ai_img = await self._generate_ai_artwork(
                 prompt=prompt,
                 output_path=output_path,
                 target_w=width,
@@ -466,83 +430,15 @@ class ComfyUIProvider:
                 scene_index=scene_index,
                 art_style=art_style,
             )
-            if flux_img and flux_img.exists() and flux_img.stat().st_size > 10000:
-                return flux_img
+            if ai_img and ai_img.exists() and ai_img.stat().st_size > 4000:
+                return ai_img
         except Exception as e:
-            logger.warning(f"Tier 1 [Flux.1 Photorealistic AI] failed: {e}")
+            logger.warning(f"Tier 2 [AI Multi-Model Artwork] failed: {e}")
 
         # ------------------------------------------------------------------
-        # TIER 2: Web Photographic Engine (Google / Bing Global Web Index)
+        # TIER 3: Atmospheric Procedural Canvas (Safe Offline Fallback)
         # ------------------------------------------------------------------
-        try:
-            logger.info("Calling Tier 2 [Web Photographic Engine] for authentic internet imagery...")
-            web_photo = await self._search_web_photographic_match(
-                prompt=prompt,
-                keywords=keywords,
-                narration=narration,
-                output_path=output_path,
-                target_w=width,
-                target_h=height,
-                topic=topic,
-                scene_index=scene_index,
-            )
-            if web_photo and web_photo.exists() and web_photo.stat().st_size > 5000:
-                logger.info(f"Tier 2 [Web Photographic Engine] successfully retrieved: {output_path}")
-                return web_photo
-        except Exception as e:
-            logger.warning(f"Tier 2 [Web Photographic Engine] failed: {e}")
-
-        # ------------------------------------------------------------------
-        # TIER 3: Semantic Photographic Matcher (Wikimedia Commons 100M+ photos)
-        # ------------------------------------------------------------------
-        try:
-            logger.info("Calling Tier 3 [Wikimedia Photographic Matcher] for documentary imagery...")
-            photo_path = await self._generate_photographic_match(
-                prompt=prompt,
-                keywords=keywords,
-                narration=narration,
-                output_path=output_path,
-                target_w=width,
-                target_h=height,
-                topic=topic,
-                scene_index=scene_index,
-            )
-            if photo_path and photo_path.exists() and photo_path.stat().st_size > 5000:
-                logger.info(f"Tier 3 [Wikimedia Matcher] successfully retrieved: {output_path}")
-                return photo_path
-        except Exception as e:
-            logger.warning(f"Tier 3 [Wikimedia Matcher] failed: {e}")
-
-
-        # ------------------------------------------------------------------
-        # TIER 4: Google Imagen 3 (Gemini API Key)
-        # ------------------------------------------------------------------
-        try:
-            from app.services.gemini_image_provider import gemini_image_provider
-            gemini_img = await gemini_image_provider.generate_image(prompt, output_path)
-            if gemini_img and gemini_img.exists() and gemini_img.stat().st_size > 5000:
-                logger.info(f"Tier 4 [Google Imagen 3] generated: {output_path}")
-                return gemini_img
-        except Exception as e:
-            logger.warning(f"Tier 4 [Google Imagen 3] failed: {e}")
-
-        # ------------------------------------------------------------------
-        # TIER 5: Local ComfyUI (if running)
-        # ------------------------------------------------------------------
-        if await self.is_available():
-            try:
-                logger.info(f"ComfyUI is online at {self.base_url}. Generating via SDXL...")
-                image_path = await self._generate_comfyui(prompt, output_path)
-                if image_path and image_path.exists():
-                    logger.info(f"Tier 5 [ComfyUI] generated: {output_path}")
-                    return image_path
-            except Exception as e:
-                logger.warning(f"Tier 5 [ComfyUI] failed ({e})")
-
-        # ------------------------------------------------------------------
-        # TIER 6: Atmospheric Procedural Canvas
-        # ------------------------------------------------------------------
-        logger.info("Using Tier 6 procedural cinematic canvas fallback...")
+        logger.info("Using Tier 3 procedural cinematic canvas fallback (no web scraping)...")
         return self._generate_procedural_fallback(prompt, output_path, width, height)
 
     async def _generate_comfyui(self, prompt: str, output_path: Path) -> Path:

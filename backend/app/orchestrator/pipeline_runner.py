@@ -197,14 +197,14 @@ class PipelineRunner:
                     comfyui_provider.reset_used_assets()
 
                     has_pexels = bool(getattr(settings, "PEXELS_API_KEY", "").strip())
-                    engine_name = "Pexels 4K Pro Library" if has_pexels else "Flux.1 AI Siêu Thực & Web Index"
+                    engine_name = "Pexels 4K Pro Library" if has_pexels else "Flux.1 & Turbo AI Studio 8K"
 
                     for idx, sc in enumerate(scenes):
                         # Broadcast searching event with prompt & keywords
                         await self.log_job_event(
                             job_id=job_id,
                             stage="image_generation",
-                            message=f"Cảnh {idx+1}/{len(scenes)}: Đang lấy visual từ {engine_name} cho '{getattr(sc, 'visual_keywords', '')}'...",
+                            message=f"Cảnh {idx+1}/{len(scenes)}: Đang tạo visual từ {engine_name} cho '{getattr(sc, 'visual_keywords', '')}'...",
                             progress=round(30.0 + idx / len(scenes) * 20.0, 1),
                             extra_data={
                                 "scene_index": idx,
@@ -213,8 +213,8 @@ class PipelineRunner:
                                 "visual_prompt": sc.visual_prompt,
                                 "visual_keywords": getattr(sc, "visual_keywords", ""),
                                 "search_engine": engine_name,
-                                "action": "searching_web",
-                                "status": "searching",
+                                "action": "generating_visual",
+                                "status": "generating",
                             },
                         )
 
@@ -241,7 +241,7 @@ class PipelineRunner:
                         elif has_pexels:
                             asset_type = "ảnh chụp Pexels 4K"
                         else:
-                            asset_type = "ảnh AI Flux.1 Siêu Thực 8K"
+                            asset_type = "ảnh AI Điện Ảnh 8K (Flux / Turbo)"
                         rel_media_url = f"/static/outputs/{project_id}/scenes/{asset_path.name}"
                         pct = 30.0 + (idx + 1) / len(scenes) * 20.0
 
